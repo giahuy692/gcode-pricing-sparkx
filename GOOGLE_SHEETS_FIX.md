@@ -1,33 +1,37 @@
-# Sửa lỗi lưu Google Sheets
+# Tự động lưu Google Sheets — 30/10/2026
 
-## Kết quả kiểm tra ngày 30/10/2026
+Hướng dẫn cấu hình hiện hành nằm trong [README](README.md#tự-động-lưu-đơn-vào-dgh-aqualab). Phải triển khai cả website và Apps Script; chỉ thay source website chưa kích hoạt lưu thật.
 
-- Repository gốc: giahuy692/gcode-pricing-sparkx, commit cdf592522d145f166592cd05fe6365674085074f.
-- Webhook mặc định trả HTTP 302 sang accounts.google.com/ServiceLogin trong yêu cầu không đăng nhập. Đây là bằng chứng endpoint chưa cho phép ứng dụng web hiện tại gọi ẩn danh; không đủ dữ liệu để biết cấu hình quyền chính xác trong tài khoản chủ sở hữu.
-- Client cũ dùng no-cors và luôn báo thành công sau fetch, dù phản hồi opaque không xác nhận được việc ghi dữ liệu.
-- Kiểm tra GET cũ chấp nhận cả phản hồi JSON lỗi/null và gán mọi lỗi mạng cho quyền Only myself.
+## Phạm vi đã xác nhận
+
+- Chỉ tự gửi đơn đã lưu vào lịch sử. Nạp G-code hoặc chỉnh giá không tự gửi báo giá nháp.
+- Bảng tính đích là DGH AquaLab, ID `1In-uUOEvUZmSfK7kQEOSgVUi_Cjaoeowi32k7pbBXFs`, tab riêng `QuanLyGCodeIn3D`.
+- Giữ xuất Excel, file Excel liên kết và các tab Google Sheets khác.
+
+## Kết quả kiểm tra trực tiếp
+
+- Local và GitHub main cùng commit nền `35f89789f45a6cd60b6206f60384853e36605cea`.
+- Apps Script liên kết với bảng tính vẫn dùng mã cũ ghi vào tab đang chọn, thiếu cột phụ kiện.
+- Deployment phiên bản 1 lúc 13:14 ngày 30/10/2026 đặt quyền `Chỉ mình tôi` và thực thi bằng `Người dùng truy cập vào ứng dụng web`. Cấu hình này chưa phục vụ được website GitHub Pages gọi không đăng nhập.
 
 ## Thay đổi
 
-- POST text/plain ở chế độ CORS, chỉ báo lưu thành công sau HTTP thành công và JSON status=success.
-- Timeout 30 giây; không tự gửi lại vì thao tác có thể đã ghi nhưng mất phản hồi.
-- Kiểm tra URL /exec và response health của CostMaster; trạng thái có URL chỉ là đã cấu hình.
-- Đồng bộ tự động báo lỗi, batch hiển thị số đơn được xác nhận trên tổng số đơn.
-- Apps Script kiểm tra payload, dùng ScriptLock tránh xung đột tạo tab/header và flush trước khi xác nhận.
-- Chỉ ghi tab QuanLyGCodeIn3D; không xóa dữ liệu hoặc các tab khác.
+- Giữ đơn chờ trong lịch sử trình duyệt; gửi lại khi mở trang, có mạng trở lại và mỗi 60 giây lúc trang đang mở.
+- UUID cho đơn mới; thêm cột X `Mã Đơn Hàng`, cùng mã sẽ cập nhật cùng dòng. ScriptLock bảo vệ kiểm tra mã và ghi dòng; flush trước phản hồi thành công.
+- Client chỉ gửi vào webhook phiên bản 2 xác nhận đúng bảng tính đích; chỉ đánh dấu đã lưu sau khi response khớp mã đơn và ID bảng tính. Lỗi mạng/CORS hoặc response không đọc được vẫn là chưa xác nhận.
+- Khóa ghi `COSTMASTER_SYNC_TOKEN` lưu trong Script Properties và cấu hình trình duyệt, không hardcode vào source. POST text/plain để tránh CORS preflight không cần thiết.
+- Kiểm tra dữ liệu số, giới hạn văn bản, vô hiệu hóa công thức từ tên file/ghi chú; dừng ghi nếu cấu trúc cột khác. Các tab khác không được đổi tên hoặc ghi đè.
+- Hiển thị trạng thái từng đơn và tổng số chờ. Chặn HTML từ tên file, ghi chú và phụ kiện trong các vùng hiển thị liên quan đến khóa trình duyệt.
+- Excel thiếu mã đơn nhận UUID để các file khác nhau không cập nhật nhầm cùng dòng trên Sheets. Các dòng Sheets cũ không có mã không được tự gộp với đơn mới.
 
-## Triển khai hai phía
+## Kiểm chứng
 
-1. Website: đưa mã đã sửa lên nhánh main của repository gốc. Dự án là HTML/JS tĩnh, không cần npm build. Giữ nguyên cấu hình GitHub Pages hiện có; kiểm tra lần triển khai Pages thành công trong GitHub. Không chuyển nhà cung cấp hosting.
-2. Apps Script: mở Google Sheet đích → Tiện ích mở rộng → Apps Script. Sao lưu mã cũ. Cập nhật phần webhook bằng mã google-apps-script/Code.gs; giữ lại các hàm riêng của bảng tính nếu có. Từ Triển khai → Quản lý các bản triển khai → chỉnh sửa Web app hiện tại → Phiên bản mới; thực thi dưới tài khoản chủ sở hữu và cho phép Bất kỳ ai (Anyone). Nếu tạo deployment mới, thay URL /exec trong cài đặt website.
-3. Mở URL /exec trong cửa sổ ẩn danh: phải trả JSON có status online và targetSheet QuanLyGCodeIn3D, không chuyển sang trang đăng nhập.
-4. Trong website, Google Sheets → nhập URL /exec → Gửi 1 Dòng Thử Nghiệm. Kiểm tra dòng thực tế trong tab QuanLyGCodeIn3D, sau đó thử một đơn thật.
+`node --check app.js`, `node --check googlesheets.js`, `node --check excel.js` và `node --test tests/googlesheets.test.js tests/excel.test.js`.
 
-Không cần và không nên gửi mật khẩu hoặc token qua cuộc trò chuyện. Endpoint Anyone cho phép người có URL gửi dữ liệu; URL không phải cơ chế xác thực riêng cho chủ sở hữu.
+26 kiểm thử tự động đạt, gồm mất phản hồi sau khi đã ghi, gửi lại không trùng, sai khóa, sai bảng tính, sai cấu trúc cột, công thức từ dữ liệu và Excel thiếu mã.
 
-## Kiểm thử
+Đã kiểm tra giao diện trình duyệt: nạp mẫu không tạo đơn; lưu đơn tạo trạng thái chờ; tải lại trang vẫn giữ đơn chờ. Chưa xác nhận ghi thật qua CORS vào Google Sheets tại thời điểm ghi tài liệu này. Chưa đưa bản website mới lên GitHub Pages.
 
-Chạy: node --test tests/googlesheets.test.js
+## Giới hạn
 
-9/9 kiểm thử tự động đạt; kiểm tra cú pháp app.js và googlesheets.js đạt.
-Tests mô phỏng fetch và Google Apps Script services. Chưa kiểm thử trình duyệt/CORS thực tế hoặc ghi vào Google Sheet vì endpoint hiện yêu cầu đăng nhập. Chưa đẩy commit hoặc deploy do không có quyền ghi GitHub trong phiên làm việc.
+Đây là lưu một chiều; không tự lấy lịch sử từ Sheets về thiết bị khác. Trang đã đóng không gửi nền; mở lại để tiếp tục. Không xóa dữ liệu trình duyệt khi còn đơn chờ. Giữ kín khóa ghi; quyền Anyone áp dụng cho endpoint, không yêu cầu công khai bảng tính.

@@ -170,7 +170,7 @@ const ExcelDatabase = {
       if (typeof marginPct === 'string') marginPct = parseFloat(marginPct.replace('%', '')) || 0;
 
       const orderItem = {
-        id: row['Mã Đơn Hàng'] || ('ORD-EXCEL-' + (idx + 1)),
+        id: String(row['Mã Đơn Hàng'] || ('ORD-EXCEL-' + crypto.randomUUID())),
         createdAt: row['Thời Gian'] || row['Ngày Tạo'] || new Date().toISOString(),
         filename: filename,
         status: row['Trạng Thái'] || 'Đã tính giá',

@@ -128,6 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const gsheetModal = document.getElementById('gsheetModal');
   const btnCloseGSheetModal = document.getElementById('btnCloseGSheetModal');
   const inputGSheetWebhook = document.getElementById('inputGSheetWebhook');
+  const inputGSheetToken = document.getElementById('inputGSheetToken');
+  const gsheetSyncSummary = document.getElementById('gsheetSyncSummary');
   const gsheetConnectionLabel = document.getElementById('gsheetConnectionLabel');
   const chkAutoSyncGSheet = document.getElementById('chkAutoSyncGSheet');
   const btnCopyScriptCode = document.getElementById('btnCopyScriptCode');
@@ -142,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const icon = type === 'success' ? '✅' : 'ℹ️';
-    toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+    toast.textContent = `${icon} ${message}`;
     container.appendChild(toast);
 
     setTimeout(() => {
@@ -151,6 +153,31 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 3200);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
+  function updateGSheetSyncSummary() {
+    const url = GoogleSheetsSync.getWebhookUrl();
+    const pending = state.orders.filter(order => order.googleSheetsSyncedUrl !== url);
+    const failed = pending.find(order => order.googleSheetsSyncError);
+    gsheetSyncSummary.textContent = !GoogleSheetsSync.getToken()
+      ? 'Google Sheets: cần cấu hình khóa ghi để tự động lưu.'
+      : `${state.orders.length - pending.length}/${state.orders.length} đơn đã được Google Sheets xác nhận; ${pending.length} đơn chờ.` +
+        (!GoogleSheetsSync.isAutoSyncEnabled() ? ' Tự động lưu đang tắt.' : '') +
+        (failed ? ' Lỗi gần nhất: ' + failed.googleSheetsSyncError : '');
+    gsheetSyncSummary.style.color = failed ? '#f59e0b' : '#94a3b8';
+  }
+
+  function syncPendingOrders() {
+    return GoogleSheetsSync.syncPendingOrders(state.orders, () => {
+      saveOrdersToStorage();
+      renderOrdersTable();
+    }).then(() => updateGSheetSyncSummary());
   }
 
   // --- Load Orders from LocalStorage ---
@@ -173,8 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveOrdersToStorage() {
     try {
       localStorage.setItem('gcode_costmaster_orders', JSON.stringify(state.orders));
+      return true;
     } catch (e) {
       console.error('Lỗi khi lưu đơn hàng:', e);
+      showToast('Chưa lưu được trên máy. Hãy xuất Excel hoặc kiểm tra Google Sheets trước khi đóng trang.', 'error');
+      return false;
     }
   }
 
@@ -200,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const subtotal = (item.unitCost || 0) * (item.quantity || 1);
 
       row.innerHTML = `
-        <input type="text" class="form-control acc-input-name" value="${item.name || ''}" placeholder="Tên phụ kiện..." style="font-size: 12px; padding: 4px 8px;">
+        <input type="text" class="form-control acc-input-name" value="${escapeHtml(item.name)}" placeholder="Tên phụ kiện..." style="font-size: 12px; padding: 4px 8px;">
         <input type="number" class="form-control acc-input-cost" value="${item.unitCost || 0}" min="0" step="1000" placeholder="0" style="font-size: 12px; padding: 4px 6px; font-family: var(--font-mono); font-weight: 600;">
         <input type="number" class="form-control acc-input-qty" value="${item.quantity || 1}" min="1" step="1" style="font-size: 12px; padding: 4px 6px; font-family: var(--font-mono); font-weight: 600; text-align: center;">
         <div class="acc-row-subtotal" style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: #facc15; text-align: right;">${PricingCalculator.formatCurrency(subtotal)}</div>
@@ -582,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const newOrder = {
-      id: 'ORD-' + Date.now().toString(36).toUpperCase(),
+      id: 'ORD-' + crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       filename: state.currentParsedData.filename,
       status: selectOrderStatus.value,
@@ -592,9 +622,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     state.orders.unshift(newOrder);
-    saveOrdersToStorage();
+    const savedLocally = saveOrdersToStorage();
     renderOrdersTable();
-    showToast(`Đã lưu đơn "${newOrder.filename}" vào bảng quản lý!`);
+    if (savedLocally) showToast(`Đã lưu đơn "${newOrder.filename}" vào bảng quản lý!`);
 
     // Tự động ghi vào file Excel DB trên ổ cứng nếu đang kết nối
     if (ExcelDatabase.fileHandle) {
@@ -606,14 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Tự động đẩy lên Google Sheet nếu người dùng bật tùy chọn Auto-sync
-    if (GoogleSheetsSync.isAutoSyncEnabled() && GoogleSheetsSync.getWebhookUrl()) {
-      GoogleSheetsSync.syncOrder(newOrder).then(() => {
-        showToast('☁️ Đã đồng bộ lên Google Sheet!', 'info');
-      }).catch(err => {
-        console.warn('Lỗi auto-sync Google Sheet:', err);
-        showToast('Đơn đã lưu trên máy; đồng bộ Google Sheets chưa thành công: ' + err.message, 'error');
-      });
-    }
+    syncPendingOrders();
   });
 
   // --- Copy Quote to Clipboard (Customer-ready text) ---
@@ -670,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
       excelDbStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
       excelDbStatusBadge.style.color = '#34d399';
       excelDbStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-      excelDbPathText.innerHTML = `File Excel <strong>${fileName}</strong> đang hoạt động như Database trực tiếp. Mọi đơn hàng mới hoặc chỉnh sửa sẽ tự động lưu thẳng vào file!`;
+      excelDbPathText.textContent = `File Excel ${fileName} đang hoạt động như Database trực tiếp. Mọi đơn hàng mới hoặc chỉnh sửa sẽ tự động lưu thẳng vào file!`;
     } else if (fileName) {
       excelDbStatusBadge.textContent = `🟡 Cần cấp quyền lại: ${fileName}`;
       excelDbStatusBadge.style.background = 'rgba(245, 158, 11, 0.15)';
@@ -805,6 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Render Orders Table ---
   function renderOrdersTable() {
+    updateGSheetSyncSummary();
     ordersTableBody.innerHTML = '';
     const query = (searchOrdersInput.value || '').toLowerCase().trim();
 
@@ -834,29 +858,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const accCount = (order.accessories && order.accessories.length) || (calc.costAccessories > 0 ? 1 : 0);
       const accTag = (calc.costAccessories > 0)
-        ? `<div style="font-size: 11px; color: #facc15; margin-top: 2px;" title="${calc.accessoriesDetail || ''}">💡 Phụ kiện (${accCount} món): +${PricingCalculator.formatCurrency(calc.costAccessories)}</div>`
+        ? `<div style="font-size: 11px; color: #facc15; margin-top: 2px;" title="${escapeHtml(calc.accessoriesDetail)}">💡 Phụ kiện (${accCount} món): +${PricingCalculator.formatCurrency(calc.costAccessories)}</div>`
         : '';
 
       tr.innerHTML = `
         <td style="font-family: var(--font-mono);">${index + 1}</td>
         <td style="color: var(--text-dim); font-size: 11px;">${dateStr}</td>
         <td>
-          <div style="font-weight: 600; color: #ffffff;">${order.filename}</div>
+          <div style="font-weight: 600; color: #ffffff;">${escapeHtml(order.filename)}</div>
           <div style="font-size: 11px; color: var(--accent-cyan); margin-top: 1px;">
-            ⚙️ ${(calc.gcode && calc.gcode.printProcess && calc.gcode.printProcess.summaryText) || 'SparkX i7 Profile'}
+            ⚙️ ${escapeHtml((calc.gcode && calc.gcode.printProcess && calc.gcode.printProcess.summaryText) || 'SparkX i7 Profile')}
           </div>
           ${accTag}
-          <div style="font-size: 11px; color: var(--text-dim);">${order.notes || 'Không ghi chú'}</div>
+          <div style="font-size: 11px; color: var(--text-dim);">${escapeHtml(order.notes || 'Không ghi chú')}</div>
         </td>
-        <td style="font-family: var(--font-mono);">${calc.weightGrams || 0}g</td>
-        <td style="font-family: var(--font-mono);">${calc.timeFormatted || '--'}</td>
+        <td style="font-family: var(--font-mono);">${escapeHtml(calc.weightGrams || 0)}g</td>
+        <td style="font-family: var(--font-mono);">${escapeHtml(calc.timeFormatted || '--')}</td>
         <td style="font-family: var(--font-mono); color: #cbd5e1;">${PricingCalculator.formatCurrency(calc.totalBaseCost)}</td>
         <td style="font-family: var(--font-mono); color: #fbbf24;">${PricingCalculator.formatCurrency(calc.priceWholesale)}</td>
         <td style="font-family: var(--font-mono); font-weight: 700; color: #38bdf8;">${PricingCalculator.formatCurrency(calc.priceRetail)}</td>
         <td style="font-family: var(--font-mono); color: var(--accent-emerald);">+${PricingCalculator.formatCurrency(calc.netProfitRetail)}</td>
-        <td><span class="status-badge ${statusClass}">${order.status}</span></td>
+        <td><span class="status-badge ${statusClass}">${escapeHtml(order.status)}</span>
+          <div style="font-size: 11px;">${order.googleSheetsSyncedUrl === GoogleSheetsSync.getWebhookUrl() ? '☁️ Đã lưu Sheet' : order.googleSheetsSyncError ? '⚠️ Chờ gửi lại' : '☁️ Chờ lưu Sheet'}</div>
+        </td>
         <td>
-          <button class="btn btn-secondary btn-sm btn-delete-order" data-id="${order.id}" title="Xóa đơn này" style="padding: 4px 8px;">
+          <button class="btn btn-secondary btn-sm btn-delete-order" data-id="${escapeHtml(order.id)}" title="Xóa đơn này" style="padding: 4px 8px;">
             ❌
           </button>
         </td>
@@ -1022,6 +1048,8 @@ document.addEventListener('DOMContentLoaded', () => {
       inputGSheetWebhook.value = '';
     }
     chkAutoSyncGSheet.checked = GoogleSheetsSync.isAutoSyncEnabled();
+    inputGSheetToken.value = GoogleSheetsSync.getToken();
+    updateGSheetSyncSummary();
   }
 
   btnOpenGSheetModal.addEventListener('click', () => {
@@ -1043,11 +1071,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = inputGSheetWebhook.value.trim();
     try { if (url) GoogleSheetsSync.validateWebhookUrl(url); }
     catch (error) { alert(error.message); return; }
-    GoogleSheetsSync.setWebhookUrl(url);
-    GoogleSheetsSync.setAutoSync(chkAutoSyncGSheet.checked);
+    try {
+      GoogleSheetsSync.setWebhookUrl(url);
+      GoogleSheetsSync.setToken(inputGSheetToken.value);
+      GoogleSheetsSync.setAutoSync(chkAutoSyncGSheet.checked);
+    } catch (error) { alert('Không lưu được cấu hình trên trình duyệt: ' + error.message); return; }
     updateGSheetStatusUI();
     gsheetModal.classList.remove('active');
     showToast('Đã lưu cấu hình Google Sheets!');
+    syncPendingOrders();
   });
 
   btnCopyScriptCode.addEventListener('click', () => {
@@ -1065,7 +1097,11 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Vui lòng nhập URL Webhook Google Apps Script trước khi gửi thử nghiệm!');
       return;
     }
-    GoogleSheetsSync.setWebhookUrl(url);
+    try {
+      GoogleSheetsSync.validateWebhookUrl(url);
+      GoogleSheetsSync.setWebhookUrl(url);
+      GoogleSheetsSync.setToken(inputGSheetToken.value);
+    } catch (error) { alert(error.message); return; }
 
     showToast('Đang kiểm tra kết nối với Google Sheet...', 'info');
 
@@ -1076,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const testOrder = {
+      id: 'TEST-' + crypto.randomUUID(),
       filename: 'test_sparkx_i7_model.gcode',
       status: 'Thử nghiệm',
       notes: 'Kiểm tra kết nối Webhook từ CostMaster 3D',
@@ -1128,18 +1165,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const currentOrder = {
-      id: 'ORD-' + Date.now().toString(36).toUpperCase(),
-      createdAt: new Date().toISOString(),
-      filename: state.currentParsedData.filename,
-      status: selectOrderStatus.value,
-      notes: inputOrderNotes.value.trim(),
-      calculation: state.currentCalculation
-    };
+    btnSaveToHistory.click();
+    const currentOrder = state.orders[0];
 
     try {
       showToast('Đang đẩy dữ liệu lên Google Sheet...', 'info');
-      await GoogleSheetsSync.syncOrder(currentOrder);
+      await GoogleSheetsSync.pendingSync;
+      if (currentOrder.googleSheetsSyncedUrl !== webhookUrl) await GoogleSheetsSync.syncOrder(currentOrder);
+      currentOrder.googleSheetsSyncedUrl = webhookUrl;
+      delete currentOrder.googleSheetsSyncError;
+      saveOrdersToStorage();
+      renderOrdersTable();
       showToast(`☁️ Đã lưu file "${currentOrder.filename}" vào Google Sheet tập trung!`);
     } catch (e) {
       alert('Lỗi khi đẩy lên Google Sheet: ' + e.message);
@@ -1164,6 +1200,8 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         showToast(`Đang đồng bộ ${state.orders.length} đơn hàng...`, 'info');
         const count = await GoogleSheetsSync.syncBatch(state.orders);
+        saveOrdersToStorage();
+        renderOrdersTable();
         showToast(`☁️ Google Sheets xác nhận ${count}/${state.orders.length} đơn. ${state.orders.length - count} đơn chưa được xác nhận.`);
       } catch (e) {
         alert('Lỗi đồng bộ: ' + e.message);
@@ -1175,6 +1213,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAccessoriesList();
   loadOrders();
   updateGSheetStatusUI();
+  syncPendingOrders();
+  window.addEventListener('online', syncPendingOrders);
+  setInterval(syncPendingOrders, 60000);
 
   // Tự động nạp mẫu Cura mặc định khi mở trang lần đầu để giao diện có dữ liệu sống động ngay lập tức!
   btnLoadCuraDemo.click();

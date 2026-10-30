@@ -8,6 +8,19 @@ global.XLSX = XLSX;
 
 const ExcelDatabase = require('../excel.js');
 
+test('Excel imports without IDs cannot overwrite different orders in Google Sheets', async () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Tên File G-Code', 'Khối Lượng (g)'], ['model.gcode', 10]
+  ]), 'QuanLyDonHangIn3D');
+  const bytes = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  const blob = new Blob([bytes]);
+  const first = await ExcelDatabase.readOrdersFromBlob(blob);
+  const second = await ExcelDatabase.readOrdersFromBlob(blob);
+  assert.notEqual(first[0].id, second[0].id);
+  assert.match(first[0].id, /^ORD-EXCEL-/);
+});
+
 test('ExcelDatabase buildWorkbook creates proper sheets and columns', () => {
   const sampleOrders = [
     {
@@ -113,3 +126,4 @@ test('ExcelDatabase reads orders correctly from buffer', async () => {
   assert.strictEqual(parsed[0].calculation.totalBaseCost, 94545);
   assert.strictEqual(parsed[0].calculation.costAccessories, 50000);
 });
+

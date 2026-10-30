@@ -1,199 +1,106 @@
-// ========================================================
-// MÃ GOOGLE APPS SCRIPT CHO G-CODE COSTMASTER 3D (SPARKX i7)
-// Hướng dẫn:
-// 1. Mở file Google Sheet "DGH AquaLab" của bạn trên trình duyệt
-// 2. Vào menu: Tiện ích mở rộng (Extensions) -> Apps Script
-// 3. Xóa hết mã cũ trong đó, dán toàn bộ đoạn mã này vào rồi bấm Lưu (Ctrl+S)
-// 4. Bấm "Triển khai" (Deploy) -> "Tùy chọn triển khai mới" (New deployment)
-// 5. Chọn loại: "Ứng dụng web" (Web app)
-//    - Người thực thi: "Tôi" (Me)
-//    - Ai có quyền truy cập: "Bất kỳ ai" (Anyone)  <--- BẮT BUỘC CHỌN "BẤT KỲ AI"
-// 6. Bấm "Triển khai" và sao chép URL Ứng dụng web dán vào G-Code CostMaster!
-// ========================================================
+// G-Code CostMaster: chỉ ghi tab QuanLyGCodeIn3D trong DGH AquaLab.
+// Cài đặt dự án > Thuộc tính tập lệnh: thêm COSTMASTER_SYNC_TOKEN (ít nhất 32 ký tự).
+// Triển khai Web app: thực thi bằng tài khoản chủ sở hữu, truy cập Anyone.
+// Khóa ghi chỉ lưu trong Thuộc tính tập lệnh và cài đặt trình duyệt, không đưa lên GitHub.
+var COSTMASTER_SPREADSHEET_ID = '1In-uUOEvUZmSfK7kQEOSgVUi_Cjaoeowi32k7pbBXFs';
+var COSTMASTER_SHEET = 'QuanLyGCodeIn3D';
+var COSTMASTER_HEADERS = [
+  'Thời Gian', 'Tên File G-Code', 'Máy In', 'Loại Nhựa', 'Thời Gian In',
+  'Số Giờ (h)', 'Khối Lượng (g)', 'Số Lớp', 'Tiền Nhựa (đ)', 'Tiền Điện (đ)',
+  'Khấu Hao Máy (đ)', 'Tiền Công (đ)', 'Dự Phòng Rủi Ro (đ)', 'Tiền Phụ Kiện (đ)',
+  'Chi Tiết Phụ Kiện', 'GIÁ VỐN TOÀN DIỆN (đ)', 'GIÁ SỈ (đ)', 'GIÁ BÁN LẺ (đ)',
+  'LỢI NHUẬN RÒNG (đ)', 'Tỷ Suất LN', 'Trạng Thái', 'Cài Đặt In (Profile)',
+  'Ghi Chú', 'Mã Đơn Hàng'
+];
 
-function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Không tìm thấy bảng tính. Tạo Apps Script từ Tiện ích mở rộng của Google Sheet đích.'})).setMimeType(ContentService.MimeType.JSON);
-  ss.getName();
-  return ContentService.createTextOutput(JSON.stringify({
-    status: 'online',
-    message: 'G-Code CostMaster Webhook is LIVE! (Sẵn sàng nhận dữ liệu)',
-    targetSheet: 'QuanLyGCodeIn3D',
-    timestamp: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
+function costmasterJson(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ========================================================
-// HÀM CHẠY TRỰC TIẾP TẠO TAB & DỮ LIỆU MẪU NGAY LẬP TỨC:
-// Trong Apps Script, chọn hàm "testTaoTabQuanLyGCode" và bấm nút "▷ Chạy" (Run)
-// để tab "QuanLyGCodeIn3D" xuất hiện ngay trong Google Sheet của bạn!
-// ========================================================
-function testTaoTabQuanLyGCode() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var targetSheetName = 'QuanLyGCodeIn3D';
-  var sheet = ss.getSheetByName(targetSheetName);
-  
-  if (!sheet) {
-    sheet = ss.insertSheet(targetSheetName);
-    sheet.setTabColor('#0284c7');
+function doGet() {
+  try {
+    var ss = SpreadsheetApp.openById(COSTMASTER_SPREADSHEET_ID);
+    return costmasterJson({
+      status: 'online', protocolVersion: 2, authRequired: true,
+      spreadsheetId: ss.getId(), targetSheet: COSTMASTER_SHEET,
+      spreadsheetUrl: ss.getUrl()
+    });
+  } catch (error) {
+    return costmasterJson({ status: 'error', message: error.message });
   }
-  
-  if (sheet.getLastRow() === 0) {
-    var headers = [
-      'Thời Gian',
-      'Tên File G-Code',
-      'Máy In',
-      'Loại Nhựa',
-      'Thời Gian In',
-      'Số Giờ (h)',
-      'Khối Lượng (g)',
-      'Số Lớp',
-      'Tiền Nhựa (đ)',
-      'Tiền Điện (đ)',
-      'Khấu Hao Máy (đ)',
-      'Tiền Công (đ)',
-      'Dự Phòng Rủi Ro (đ)',
-      'Tiền Phụ Kiện (đ)',
-      'Chi Tiết Phụ Kiện',
-      'GIÁ VỐN TOÀN DIỆN (đ)',
-      'GIÁ SỈ (đ)',
-      'GIÁ BÁN LẺ (đ)',
-      'LỢI NHUẬN RÒNG (đ)',
-      'Tỷ Suất LN',
-      'Trạng Thái',
-      'Cài Đặt In (Profile)',
-      'Ghi Chú'
-    ];
-    sheet.appendRow(headers);
-    
-    var headerRange = sheet.getRange(1, 1, 1, headers.length);
-    headerRange.setBackground('#0f172a');
-    headerRange.setFontColor('#38bdf8');
-    headerRange.setFontWeight('bold');
-    headerRange.setHorizontalAlignment('center');
-    sheet.setFrozenRows(1);
+}
+
+function costmasterText(value) {
+  if (value == null) return '';
+  if (typeof value !== 'string' || value.length > 10000) throw new Error('Trường văn bản không hợp lệ');
+  // Không thực thi tên file, ghi chú hoặc cấu hình in như công thức bảng tính.
+  return /^\s*[=+@-]/.test(value) ? "'" + value : value;
+}
+
+function costmasterNumber(data, key, allowNegative) {
+  var value = data[key] == null ? 0 : data[key];
+  if (typeof value !== 'number' || !isFinite(value) || (!allowNegative && value < 0)) {
+    throw new Error('Giá trị số không hợp lệ: ' + key);
   }
-  
-  sheet.appendRow([
-    Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'),
-    'test_sparkx_i7_model.gcode',
-    'SparkX i7',
-    'PETG',
-    '3 giờ 15 phút',
-    3.25,
-    85,
-    320,
-    19500,
-    2000,
-    10000,
-    11000,
-    2500,
-    40000,
-    'Bộ LED USB 5V Lightbox',
-    85000,
-    115000,
-    165000,
-    80000,
-    '48.5%',
-    'Thử nghiệm thành công',
-    'SparkX i7: 210°C / 60°C • Infill 20% • 80mm/s',
-    'Kích hoạt tab thành công từ Google Apps Script!'
-  ]);
-  
-  SpreadsheetApp.getUi().alert('🎉 CHÚC MỪNG!\nĐã tạo thành công tab "QuanLyGCodeIn3D" với dữ liệu mẫu!\nHãy quay lại bảng tính Google Sheets của bạn để kiểm tra.');
+  return value;
 }
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
+  var locked = false;
   try {
-    lock.waitLock(30000);
-    if (!e || !e.postData || !e.postData.contents) throw new Error('Thiếu dữ liệu POST');
+    if (!e || !e.postData || !e.postData.contents || e.postData.contents.length > 100000) {
+      throw new Error('Thiếu dữ liệu POST hoặc dữ liệu quá lớn');
+    }
     var data = JSON.parse(e.postData.contents);
-    if (data.action !== 'add_row' || !data.filename) throw new Error('Dữ liệu đơn hàng không hợp lệ');
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // Luôn ghi dữ liệu vào tab chuyên biệt riêng 'QuanLyGCodeIn3D'
-    // Giữ nguyên vẹn 100% các tab hiện có (1_CONG_CU_CHINH, 2_KHO,...)
-    var targetSheetName = 'QuanLyGCodeIn3D';
-    var sheet = ss.getSheetByName(targetSheetName);
-    
-    // Nếu chưa có tab 'QuanLyGCodeIn3D', tự động tạo tab mới!
-    if (!sheet) {
-      sheet = ss.insertSheet(targetSheetName);
-    }
-    
-    // Nếu bảng tính mới hoàn toàn, tự động tạo Tiêu đề cột đẹp mắt
+    var token = PropertiesService.getScriptProperties().getProperty('COSTMASTER_SYNC_TOKEN');
+    if (!token || token.length < 32 || !data || data.token !== token) throw new Error('Khóa ghi không hợp lệ');
+    if (data.action !== 'add_row' || data.spreadsheetId !== COSTMASTER_SPREADSHEET_ID ||
+        typeof data.orderId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(data.orderId) ||
+        typeof data.filename !== 'string' || !data.filename.trim()) throw new Error('Dữ liệu đơn hàng không hợp lệ');
+
+    var row = [
+      costmasterText(data.createdAt || Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm:ss')),
+      costmasterText(data.filename), costmasterText(data.printerModel || 'SparkX i7'),
+      costmasterText(data.materialType), costmasterText(data.timeFormatted),
+      costmasterNumber(data, 'timeHours'), costmasterNumber(data, 'weightGrams'), costmasterNumber(data, 'layerCount'),
+      costmasterNumber(data, 'costFilament'), costmasterNumber(data, 'costElectricity'),
+      costmasterNumber(data, 'costDepreciation'), costmasterNumber(data, 'costLabor'), costmasterNumber(data, 'costFailRisk'),
+      costmasterNumber(data, 'costAccessories'), costmasterText(data.accessoriesDetail),
+      costmasterNumber(data, 'totalBaseCost'), costmasterNumber(data, 'priceWholesale'), costmasterNumber(data, 'priceRetail'),
+      costmasterNumber(data, 'netProfitRetail', true), costmasterNumber(data, 'profitMarginRetailPercent', true) + '%',
+      costmasterText(data.status || 'Đã tính giá'), costmasterText(data.printProcess), costmasterText(data.notes), data.orderId
+    ];
+
+    lock.waitLock(30000);
+    locked = true;
+    var ss = SpreadsheetApp.openById(COSTMASTER_SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(COSTMASTER_SHEET) || ss.insertSheet(COSTMASTER_SHEET);
     if (sheet.getLastRow() === 0) {
-      var headers = [
-        'Thời Gian',
-        'Tên File G-Code',
-        'Máy In',
-        'Loại Nhựa',
-        'Thời Gian In',
-        'Số Giờ (h)',
-        'Khối Lượng (g)',
-        'Số Lớp',
-        'Tiền Nhựa (đ)',
-        'Tiền Điện (đ)',
-        'Khấu Hao Máy (đ)',
-        'Tiền Công (đ)',
-        'Dự Phòng Rủi Ro (đ)',
-        'Tiền Phụ Kiện (đ)',
-        'Chi Tiết Phụ Kiện',
-        'GIÁ VỐN TOÀN DIỆN (đ)',
-        'GIÁ SỈ (đ)',
-        'GIÁ BÁN LẺ (đ)',
-        'LỢI NHUẬN RÒNG (đ)',
-        'Tỷ Suất LN',
-        'Trạng Thái',
-        'Cài Đặt In (Profile)',
-        'Ghi Chú'
-      ];
-      sheet.appendRow(headers);
-      
-      // Định dạng dòng tiêu đề
-      var headerRange = sheet.getRange(1, 1, 1, headers.length);
-      headerRange.setBackground('#0f172a');
-      headerRange.setFontColor('#38bdf8');
-      headerRange.setFontWeight('bold');
-      headerRange.setHorizontalAlignment('center');
+      sheet.getRange(1, 1, 1, COSTMASTER_HEADERS.length).setValues([COSTMASTER_HEADERS]);
+      sheet.getRange(1, 1, 1, COSTMASTER_HEADERS.length)
+        .setBackground('#0f172a').setFontColor('#38bdf8').setFontWeight('bold');
       sheet.setFrozenRows(1);
+    } else {
+      var headers = sheet.getRange(1, 1, 1, COSTMASTER_HEADERS.length).getValues()[0];
+      for (var i = 0; i < COSTMASTER_HEADERS.length - 1; i++) {
+        if (headers[i] !== COSTMASTER_HEADERS[i]) throw new Error('Tab đích có cấu trúc cột khác; chưa ghi để tránh lệch dữ liệu');
+      }
+      if (headers[23] && headers[23] !== COSTMASTER_HEADERS[23]) throw new Error('Cột X đã được sử dụng; chưa ghi để tránh mất dữ liệu');
+      if (!headers[23]) sheet.getRange(1, 24).setValue(COSTMASTER_HEADERS[23]);
     }
-    
-    // Thêm dòng dữ liệu mới
-    sheet.appendRow([
-      data.createdAt || Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'),
-      data.filename || '',
-      data.printerModel || 'SparkX i7',
-      data.materialType || '',
-      data.timeFormatted || '',
-      data.timeHours || 0,
-      data.weightGrams || 0,
-      data.layerCount || 0,
-      data.costFilament || 0,
-      data.costElectricity || 0,
-      data.costDepreciation || 0,
-      data.costLabor || 0,
-      data.costFailRisk || 0,
-      data.costAccessories || 0,
-      data.accessoriesDetail || '',
-      data.totalBaseCost || 0,
-      data.priceWholesale || 0,
-      data.priceRetail || 0,
-      data.netProfitRetail || 0,
-      (data.profitMarginRetailPercent || 0) + '%',
-      data.status || 'Đã tính giá',
-      data.printProcess || '',
-      data.notes || ''
-    ]);
-    
+
+    var lastRow = sheet.getLastRow();
+    var match = lastRow > 1 ? sheet.getRange(2, 24, lastRow - 1, 1)
+      .createTextFinder(data.orderId).matchEntireCell(true).matchCase(true).useRegularExpression(false).findNext() : null;
+    // Gửi lại sau mất phản hồi vẫn cập nhật đúng một dòng, giữ nguyên các dòng cũ chưa có mã đơn.
+    var rowNumber = match ? match.getRow() : lastRow + 1;
+    sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
     SpreadsheetApp.flush();
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Row added' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return costmasterJson({ status: 'success', orderId: data.orderId, spreadsheetId: ss.getId(), row: rowNumber });
+  } catch (error) {
+    return costmasterJson({ status: 'error', message: error.message });
   } finally {
-    lock.releaseLock();
+    if (locked) lock.releaseLock();
   }
 }

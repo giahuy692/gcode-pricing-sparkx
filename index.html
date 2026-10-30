@@ -429,7 +429,7 @@
         <!-- Action Row -->
         <div style="display: flex; gap: 10px; margin-top: 16px;">
           <button id="btnSyncCurrentToGSheet" class="btn btn-outline-cyan" style="flex: 1;" title="Gửi ngay dòng báo giá này lên file Google Sheets của bạn">
-            ☁️ Lưu Lên Google Sheet
+            ☁️ Lưu Đơn & Đồng Bộ
           </button>
           <button id="btnCopyQuote" class="btn btn-secondary" style="flex: 1;" title="Sao chép nội dung báo giá chuyên nghiệp để gửi khách qua Zalo/Facebook">
             📋 Copy Báo Giá Cho Khách
@@ -446,7 +446,7 @@
             <span class="icon">📑</span> Bảng Quản Lý Đơn Hàng & Báo Giá In 3D
           </h2>
           <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
-            Sử dụng trực tiếp file Excel (.xlsx) trên máy tính làm Cơ sở dữ liệu (Database) trung tâm.
+            Đơn đã lưu được tự động gửi vào Google Sheets DGH AquaLab; có thể xuất thêm Excel trên máy.
           </p>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
@@ -460,6 +460,11 @@
         </div>
       </div>
 
+      <p id="gsheetSyncSummary" role="status" aria-live="polite" style="font-size: 12px; margin-bottom: 12px; overflow-wrap: anywhere;"></p>
+      <p style="font-size: 12px; margin-bottom: 12px;">
+        <a href="https://docs.google.com/spreadsheets/d/1In-uUOEvUZmSfK7kQEOSgVUi_Cjaoeowi32k7pbBXFs/edit" target="_blank" rel="noopener noreferrer">Mở bảng tính DGH AquaLab</a>
+        · Mất mạng: đơn chờ trên máy, tự gửi lại khi có mạng hoặc mở lại trang. Xóa lịch sử trên máy không xóa dữ liệu đã lưu trên Google Sheets.
+      </p>
       <!-- Excel Database Control Bar -->
       <div class="excel-db-bar" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -649,6 +654,12 @@
           <input type="url" id="inputGSheetWebhook" class="form-control" placeholder="https://script.google.com/macros/s/AKfycbx.../exec">
         </div>
 
+        <div class="form-group">
+          <label for="inputGSheetToken" class="form-label">Khóa ghi Google Sheets</label>
+          <input type="password" id="inputGSheetToken" class="form-control" autocomplete="off" placeholder="Khóa COSTMASTER_SYNC_TOKEN trong Apps Script">
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">Nhập cùng khóa đã đặt trong Thuộc tính tập lệnh. Cấu hình một lần trên mỗi trình duyệt; giữ kín khóa này.</p>
+        </div>
+
         <div style="margin-bottom: 18px;">
           <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main);">
             <input type="checkbox" id="chkAutoSyncGSheet" style="width: 16px; height: 16px; accent-color: var(--accent-cyan);">
@@ -659,7 +670,7 @@
         <!-- Instructions Box -->
         <div class="instructions-card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <strong style="font-size: 13px; color: #ffffff;">📖 Hướng dẫn thiết lập trong 60 giây (Chỉ cần làm 1 lần):</strong>
+            <strong style="font-size: 13px; color: #ffffff;">📖 Thiết lập một lần cho DGH AquaLab:</strong>
             <button id="btnCopyScriptCode" class="btn btn-outline-cyan btn-sm" type="button" title="Sao chép đoạn mã Apps Script">
               📋 Copy Mã Apps Script
             </button>
@@ -672,7 +683,7 @@
 
           <div class="instruction-step">
             <span class="step-num">2</span>
-            <div>Trên Google Sheet, vào menu: <strong>Tiện ích mở rộng (Extensions)</strong> &rarr; <strong>Apps Script</strong>. Xóa hết mã cũ trong file <code>Code.gs</code>, dán toàn bộ mã vừa copy vào &rarr; Nhấn <strong>Lưu</strong> (Ctrl+S).</div>
+            <div>Trên Google Sheet, vào <strong>Tiện ích &rarr; Apps Script</strong>. Sao lưu mã cũ, thay phần webhook CostMaster bằng mã vừa copy; giữ các hàm khác nếu có. Lưu dự án. Vào <strong>Cài đặt dự án &rarr; Thuộc tính tập lệnh</strong>, đặt <code>COSTMASTER_SYNC_TOKEN</code> bằng một khóa ngẫu nhiên ít nhất 32 ký tự, rồi nhập cùng khóa vào ô bên trên.</div>
           </div>
 
           <div class="instruction-step">
@@ -681,14 +692,14 @@
               <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-dim); line-height: 1.6;">
                 <li>Người thực thi (Execute as): <strong>Tôi (Me)</strong></li>
                 <li><strong style="color: #facc15;">⚠️ Ai có quyền truy cập (Who has access):</strong> Chọn <strong style="color: #10b981; font-size: 14px;">Bất kỳ ai (Anyone)</strong> <em>(Bắt buộc! Nếu chọn "Chỉ mình tôi", Google sẽ chặn bảo mật đòi đăng nhập và không ghi được dữ liệu).</em></li>
-                <li>Bấm <strong>Triển khai</strong> &rarr; Chọn <em>Cấp quyền truy cập</em> &rarr; <em>Nâng cao</em> &rarr; <em>Đi tới... (không an toàn)</em> &rarr; <em>Cho phép</em>.</li>
+                <li>Bấm <strong>Triển khai</strong> và cấp quyền cho mã Apps Script của chính bạn sau khi kiểm tra nội dung và tài khoản. Nếu đã có Web app, chọn <strong>Quản lý các bản triển khai &rarr; Chỉnh sửa &rarr; Phiên bản mới</strong>.</li>
                 <li>Sao chép <strong>URL ứng dụng web</strong> và dán vào ô bên trên &rarr; Bấm <strong>Lưu Cấu Hình</strong>!</li>
               </ul>
             </div>
           </div>
           
           <div style="margin-top: 10px; padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 12px; color: #bae6fd;">
-            💡 <strong>Dữ liệu lưu ở đâu?</strong> Hệ thống sẽ tự động tạo một tab mới toanh tên <strong>QuanLyGCodeIn3D</strong> ở thanh tab dưới cùng. Các tab làm việc hiện tại của bạn (<em>1_CONG_CU_CHINH, 2_KHO,...</em>) được bảo vệ an toàn 100%, không bị chèn đè hay xáo trộn!
+            💡 Dữ liệu chỉ ghi vào <strong>QuanLyGCodeIn3D</strong> trong DGH AquaLab. Cùng mã đơn sẽ cập nhật cùng một dòng. URL webhook không phải khóa bí mật; chỉ người có khóa ghi mới gửi được đơn. Không đưa khóa ghi vào source GitHub.
           </div>
         </div>
       </div>
