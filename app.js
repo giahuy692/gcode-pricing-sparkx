@@ -926,11 +926,9 @@ document.addEventListener('DOMContentLoaded', () => {
     GoogleSheetsSync.setWebhookUrl(url);
 
     const testOrder = {
-      filename: 'test_demo_dragon.gcode',
-      customerName: 'Dòng Thử Nghiệm',
-      customerPhone: '0900000000',
-      status: 'Đã báo giá',
-      notes: 'Kiểm tra kết nối Google Sheets từ CostMaster',
+      filename: 'test_sparkx_i7_model.gcode',
+      status: 'Thử nghiệm',
+      notes: 'Kiểm tra kết nối Webhook từ CostMaster 3D',
       calculation: {
         weightGrams: 85,
         timeFormatted: '3 giờ 15 phút',
@@ -940,15 +938,18 @@ document.addEventListener('DOMContentLoaded', () => {
         costDepreciation: 10000,
         costLabor: 11000,
         costFailRisk: 2500,
-        totalBaseCost: 45000,
-        priceWholesale: 68000,
-        priceRetail: 99000,
-        netProfitRetail: 54000,
-        profitMarginRetailPercent: 54.5,
+        costAccessories: 40000,
+        accessoriesDetail: 'Bộ LED USB 5V Lightbox',
+        totalBaseCost: 85000,
+        priceWholesale: 115000,
+        priceRetail: 165000,
+        netProfitRetail: 80000,
+        profitMarginRetailPercent: 48.5,
         gcode: {
-          printerModel: 'Ender-3 V3 SE',
+          printerModel: 'SparkX i7',
           materialType: 'PLA',
-          layerCount: 280
+          layerCount: 320,
+          printProcess: { summaryText: 'SparkX i7: 210°C / 60°C • Infill 20% • Tốc độ 80mm/s' }
         }
       }
     };
@@ -956,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       showToast('Đang gửi dòng thử nghiệm lên Google Sheet...', 'info');
       await GoogleSheetsSync.syncOrder(testOrder);
-      showToast('✅ Gửi thử nghiệm thành công! Hãy kiểm tra file Google Sheet của bạn.');
+      showToast('✅ Gửi thử nghiệm thành công! Dữ liệu nằm trong tab "QuanLyGCodeIn3D"');
       updateGSheetStatusUI();
     } catch (e) {
       alert('Lỗi kết nối: ' + e.message);

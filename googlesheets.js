@@ -6,16 +6,20 @@
 const GoogleSheetsSync = {
   STORAGE_KEY: 'gcode_costmaster_gsheet_url',
   AUTO_SYNC_KEY: 'gcode_costmaster_gsheet_autosync',
+  // URL Webhook mặc định được thiết lập sẵn cho bạn
+  DEFAULT_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycbyX9Xgk1G3h7JHkyy7OIByOYswhJfV6ezGxF0NTQpJd63JFjuV9QyMw3JUgRXgbIAaC/exec',
 
   /**
-   * Lấy URL Webhook Google Sheet đã lưu
+   * Lấy URL Webhook Google Sheet (mặc định lấy URL đã tích hợp sẵn của bạn)
    */
   getWebhookUrl() {
     try {
-      return localStorage.getItem(this.STORAGE_KEY) || '';
-    } catch (e) {
-      return '';
-    }
+      const saved = localStorage.getItem(this.STORAGE_KEY);
+      if (saved && saved.trim()) {
+        return saved.trim();
+      }
+    } catch (e) {}
+    return this.DEFAULT_WEBHOOK_URL;
   },
 
   /**
@@ -147,11 +151,15 @@ const GoogleSheetsSync = {
 function doPost(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getActiveSheet();
     
-    // Tự động đặt tên sheet nếu muốn
-    if (sheet.getName() === 'Trang tính1' || sheet.getName() === 'Sheet1') {
-      sheet.setName('QuanLyGCodeIn3D');
+    // Luôn ghi dữ liệu vào tab chuyên biệt riêng 'QuanLyGCodeIn3D'
+    // Đảm bảo không làm ảnh hưởng hay xáo trộn các tab khác (1_CONG_CU_CHINH, Kho, v.v.)
+    var targetSheetName = 'QuanLyGCodeIn3D';
+    var sheet = ss.getSheetByName(targetSheetName);
+    
+    // Nếu chưa có tab 'QuanLyGCodeIn3D', tự động tạo mới!
+    if (!sheet) {
+      sheet = ss.insertSheet(targetSheetName);
     }
     
     var data = JSON.parse(e.postData.contents);
