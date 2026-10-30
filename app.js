@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const pctLaborText = document.getElementById('pctLaborText');
   const costRiskText = document.getElementById('costRiskText');
   const pctRiskText = document.getElementById('pctRiskText');
+  const costAccessoriesText = document.getElementById('costAccessoriesText');
+  const pctAccessoriesText = document.getElementById('pctAccessoriesText');
 
   // Stacked Bars
   const barFilament = document.getElementById('barFilament');
@@ -54,12 +56,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const barLabor = document.getElementById('barLabor');
   const barElectricity = document.getElementById('barElectricity');
   const barRisk = document.getElementById('barRisk');
+  const barAccessories = document.getElementById('barAccessories');
 
   // Tuning Inputs
   const quickFilamentCost = document.getElementById('quickFilamentCost');
   const liveFilamentPrice = document.getElementById('liveFilamentPrice');
   const quickRetailMarkup = document.getElementById('quickRetailMarkup');
   const liveMarkup = document.getElementById('liveMarkup');
+
+  // Accessories Elements
+  const inputAccessoryCost = document.getElementById('inputAccessoryCost');
+  const inputAccessoryDetail = document.getElementById('inputAccessoryDetail');
+  const badgeAccessoryCost = document.getElementById('badgeAccessoryCost');
+  const btnClearAccessories = document.getElementById('btnClearAccessories');
+  const accQuickChips = document.querySelectorAll('.acc-quick-chip');
 
   // Order Inputs
   const selectOrderStatus = document.getElementById('selectOrderStatus');
@@ -94,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const cfgFailRisk = document.getElementById('cfgFailRisk');
   const cfgMarkupWholesale = document.getElementById('cfgMarkupWholesale');
   const cfgMarkupRetail = document.getElementById('cfgMarkupRetail');
+  const cfgAccessoryMarkup = document.getElementById('cfgAccessoryMarkup');
 
   // Google Sheets Elements
   const btnOpenGSheetModal = document.getElementById('btnOpenGSheetModal');
@@ -154,13 +165,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function recalculateAndRender() {
     if (!state.currentParsedData) return;
 
-    // Lấy giá trị trực tiếp từ quick tuning sliders
+    // Lấy giá trị trực tiếp từ quick tuning sliders & accessory inputs
     const currentQuickFilament = parseInt(quickFilamentCost.value, 10);
     const currentQuickMarkup = parseFloat(quickRetailMarkup.value);
+    const currentAccessoryCost = Math.max(0, parseInt(inputAccessoryCost?.value || '0', 10) || 0);
+    const currentAccessoryDetail = (inputAccessoryDetail?.value || '').trim();
 
     const overrides = {
       filamentCostPerKg: currentQuickFilament,
-      markupRetail: currentQuickMarkup
+      markupRetail: currentQuickMarkup,
+      costAccessories: currentAccessoryCost,
+      accessoriesDetail: currentAccessoryDetail,
+      accessoryMarkup: state.config?.accessoryMarkup || 1.25
     };
 
     state.currentCalculation = PricingCalculator.calculate(state.currentParsedData, overrides);
@@ -204,12 +220,26 @@ document.addEventListener('DOMContentLoaded', () => {
     costRiskText.textContent = PricingCalculator.formatCurrency(calc.costFailRisk);
     pctRiskText.textContent = `${calc.breakdownPercentages.risk}%`;
 
+    // Cập nhật phụ kiện ngoài
+    if (costAccessoriesText) {
+      costAccessoriesText.textContent = PricingCalculator.formatCurrency(calc.costAccessories);
+    }
+    if (pctAccessoriesText) {
+      pctAccessoriesText.textContent = `${calc.breakdownPercentages.accessories || 0}%`;
+    }
+    if (badgeAccessoryCost) {
+      badgeAccessoryCost.textContent = PricingCalculator.formatCurrency(calc.costAccessories);
+    }
+
     // Cập nhật thanh tỷ trọng (stacked bar)
     barFilament.style.width = `${calc.breakdownPercentages.filament}%`;
     barDepreciation.style.width = `${calc.breakdownPercentages.depreciation}%`;
     barLabor.style.width = `${calc.breakdownPercentages.labor}%`;
     barElectricity.style.width = `${calc.breakdownPercentages.electricity}%`;
     barRisk.style.width = `${calc.breakdownPercentages.risk}%`;
+    if (barAccessories) {
+      barAccessories.style.width = `${calc.breakdownPercentages.accessories || 0}%`;
+    }
 
     // Cập nhật nhãn slider
     liveFilamentPrice.textContent = PricingCalculator.formatCurrency(currentQuickFilament);
@@ -319,6 +349,49 @@ document.addEventListener('DOMContentLoaded', () => {
     recalculateAndRender();
   });
 
+  // --- Accessories Event Listeners ---
+  if (inputAccessoryCost) {
+    inputAccessoryCost.addEventListener('input', () => {
+      recalculateAndRender();
+    });
+  }
+
+  if (inputAccessoryDetail) {
+    inputAccessoryDetail.addEventListener('input', () => {
+      if (state.currentCalculation) {
+        state.currentCalculation.accessoriesDetail = inputAccessoryDetail.value.trim();
+      }
+    });
+  }
+
+  if (btnClearAccessories) {
+    btnClearAccessories.addEventListener('click', () => {
+      if (inputAccessoryCost) inputAccessoryCost.value = 0;
+      if (inputAccessoryDetail) inputAccessoryDetail.value = '';
+      recalculateAndRender();
+      showToast('Đã đặt lại phụ kiện về 0đ');
+    });
+  }
+
+  accQuickChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const addCost = parseInt(chip.getAttribute('data-cost') || '0', 10);
+      const name = chip.getAttribute('data-name') || '';
+      
+      const currentVal = parseInt(inputAccessoryCost.value || '0', 10) || 0;
+      inputAccessoryCost.value = currentVal + addCost;
+
+      const currentDetail = inputAccessoryDetail.value.trim();
+      if (!currentDetail) {
+        inputAccessoryDetail.value = name;
+      } else if (!currentDetail.includes(name)) {
+        inputAccessoryDetail.value = `${currentDetail} + ${name}`;
+      }
+      recalculateAndRender();
+      showToast(`+${PricingCalculator.formatCurrency(addCost)}: ${name}`);
+    });
+  });
+
   // --- Demo Buttons Handlers ---
   btnLoadCuraDemo.addEventListener('click', async () => {
     try {
@@ -385,13 +458,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const calc = state.currentCalculation;
     const gcode = calc.gcode;
 
+    let accessoryLine = '';
+    if (calc.costAccessories > 0) {
+      accessoryLine = `\n💡 Phụ kiện đi kèm: ${calc.accessoriesDetail || 'Vật tư mua ngoài'} (+${PricingCalculator.formatCurrency(calc.costAccessories)})`;
+    }
+
     const quoteText = 
 `📦 THÔNG SỐ & BÁO GIÁ IN 3D
 ───────────────────────────
 📄 File mô hình: ${gcode.filename}
 ⚙️ Máy in công nghiệp: ${gcode.printerModel || 'SparkX i7'} (Khổ lớn, ray trượt chuẩn xác, lớp ${gcode.layerHeight || 0.2}mm)
 ⚖️ Khối lượng nhựa: ${calc.weightGrams}g (${gcode.materialType || 'PLA'})
-⏱️ Thời gian in: ${calc.timeFormatted}
+⏱️ Thời gian in: ${calc.timeFormatted}${accessoryLine}
 
 💰 GIÁ BÁN LẺ ĐỀ XUẤT: ${PricingCalculator.formatCurrency(calc.priceRetail)}
 🏷️ GIÁ SỈ / ĐẠI LÝ: ${PricingCalculator.formatCurrency(calc.priceWholesale)}
@@ -468,6 +546,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
 
+      const accTag = (calc.costAccessories > 0)
+        ? `<div style="font-size: 11px; color: #facc15; margin-top: 2px;">💡 Phụ kiện: +${PricingCalculator.formatCurrency(calc.costAccessories)} (${calc.accessoriesDetail || 'Linh kiện ngoài'})</div>`
+        : '';
+
       tr.innerHTML = `
         <td style="font-family: var(--font-mono);">${index + 1}</td>
         <td style="color: var(--text-dim); font-size: 11px;">${dateStr}</td>
@@ -476,6 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div style="font-size: 11px; color: var(--accent-cyan); margin-top: 1px;">
             ⚙️ ${(calc.gcode && calc.gcode.printProcess && calc.gcode.printProcess.summaryText) || 'SparkX i7 Profile'}
           </div>
+          ${accTag}
           <div style="font-size: 11px; color: var(--text-dim);">${order.notes || 'Không ghi chú'}</div>
         </td>
         <td style="font-family: var(--font-mono);">${calc.weightGrams || 0}g</td>
@@ -576,6 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cfgFailRisk.value = cfg.failRiskPercent;
     cfgMarkupWholesale.value = cfg.markupWholesale;
     cfgMarkupRetail.value = cfg.markupRetail;
+    if (cfgAccessoryMarkup) cfgAccessoryMarkup.value = cfg.accessoryMarkup || 1.25;
   }
 
   btnOpenSettings.addEventListener('click', () => {
@@ -597,16 +681,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const updated = {
       filamentCostPerKg: parseFloat(cfgFilamentCost.value) || 220000,
       wastagePercent: parseFloat(cfgWastagePercent.value) || 5,
-      machinePowerWatt: parseFloat(cfgMachinePower.value) || 220,
+      machinePowerWatt: parseFloat(cfgMachinePower.value) || 380,
       electricityPricePerKwh: parseFloat(cfgElectricityPrice.value) || 2600,
-      machinePrice: parseFloat(cfgMachinePrice.value) || 8000000,
-      machineLifespanHours: parseFloat(cfgMachineLifespan.value) || 3500,
-      maintenancePerHour: parseFloat(cfgMaintenancePerHour.value) || 1000,
-      laborRatePerHour: parseFloat(cfgLaborRate.value) || 45000,
+      machinePrice: parseFloat(cfgMachinePrice.value) || 28000000,
+      machineLifespanHours: parseFloat(cfgMachineLifespan.value) || 8000,
+      maintenancePerHour: parseFloat(cfgMaintenancePerHour.value) || 1500,
+      laborRatePerHour: parseFloat(cfgLaborRate.value) || 50000,
       laborTimeMinutes: parseFloat(cfgLaborTime.value) || 15,
-      failRiskPercent: parseFloat(cfgFailRisk.value) || 6,
+      failRiskPercent: parseFloat(cfgFailRisk.value) || 5,
       markupWholesale: parseFloat(cfgMarkupWholesale.value) || 1.5,
-      markupRetail: parseFloat(cfgMarkupRetail.value) || 2.2
+      markupRetail: parseFloat(cfgMarkupRetail.value) || 2.2,
+      accessoryMarkup: parseFloat(cfgAccessoryMarkup?.value) || 1.25
     };
 
     state.config = PricingCalculator.saveConfig(updated);

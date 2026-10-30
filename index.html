@@ -158,6 +158,55 @@
           </div>
         </div>
 
+        <!-- Phụ Kiện & Linh Kiện Mua Ngoài (Đèn LED Lightbox, Mica, Ốc vít, Nam châm...) -->
+        <div class="instructions-card" style="margin-top: 0; margin-bottom: 20px; background: rgba(234, 179, 8, 0.05); border-color: rgba(234, 179, 8, 0.25);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #facc15; display: flex; align-items: center; gap: 6px;">
+                <span>💡 Phụ Kiện / Linh Kiện Mua Ngoài (Tùy Chọn)</span>
+                <span id="badgeAccessoryCost" class="tag" style="background: rgba(234, 179, 8, 0.15); color: #facc15; border-color: rgba(234, 179, 8, 0.3); font-size: 11px;">0 đ</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+                Dành cho sản phẩm cần mua thêm phụ kiện (ví dụ: Đèn LED Lightbox, Mica tản sáng, Nam châm, Ốc vít...)
+              </div>
+            </div>
+            <button id="btnClearAccessories" class="btn btn-secondary btn-sm" type="button" title="Đặt lại chi phí phụ kiện về 0" style="padding: 3px 8px; font-size: 11px;">
+              🔄 Xóa Phụ Kiện
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 140px 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="inputAccessoryCost" class="form-label" style="font-size: 11px; color: #facc15;">Tiền phụ kiện (VNĐ)</label>
+              <input type="number" id="inputAccessoryCost" class="form-control" value="0" min="0" step="5000" placeholder="0" style="font-family: var(--font-mono); font-weight: 700;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="inputAccessoryDetail" class="form-label" style="font-size: 11px; color: var(--text-dim);">Chi tiết phụ kiện / vật tư</label>
+              <input type="text" id="inputAccessoryDetail" class="form-control" placeholder="VD: Dây LED USB 5V + Mica tản sáng 2mm">
+            </div>
+          </div>
+
+          <!-- Quick Accessory Chips (Bấm 1 chạm để thêm nhanh) -->
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <span style="font-size: 11px; color: var(--text-dim); align-self: center; margin-right: 2px;">Gợi ý nhanh:</span>
+            <button type="button" class="btn btn-secondary btn-sm acc-quick-chip" data-name="Bộ LED Lightbox USB 5V" data-cost="40000" style="font-size: 11px; padding: 3px 8px;">
+              💡 LED Lightbox (+40k)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm acc-quick-chip" data-name="Tấm Mica Tản Sáng" data-cost="15000" style="font-size: 11px; padding: 3px 8px;">
+              🔲 Mica Tản Sáng (+15k)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm acc-quick-chip" data-name="Bộ Nguồn 12V 2A + Jack" data-cost="35000" style="font-size: 11px; padding: 3px 8px;">
+              🔌 Nguồn 12V (+35k)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm acc-quick-chip" data-name="Nam châm & Ren cấy ốc M3" data-cost="10000" style="font-size: 11px; padding: 3px 8px;">
+              🧲 Nam Châm / Ốc (+10k)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm acc-quick-chip" data-name="Hộp quà & Đóng gói hoàn thiện" data-cost="15000" style="font-size: 11px; padding: 3px 8px;">
+              📦 Hộp Đóng Gói (+15k)
+            </button>
+          </div>
+        </div>
+
         <!-- File Job Status & Notes -->
         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
@@ -203,7 +252,7 @@
             <div class="dual-box">
               <div class="dual-box-label">Giá Vốn Toàn Phần (Hòa vốn)</div>
               <div id="dispBaseCost" class="dual-box-val" style="color: #cbd5e1;">0 đ</div>
-              <div class="dual-box-sub">Đã gồm công + điện + rủi ro</div>
+              <div class="dual-box-sub">Đã gồm in + điện + phụ kiện</div>
             </div>
             <div class="dual-box">
               <div class="dual-box-label">Giá Sỉ / Đại Lý / CTV</div>
@@ -215,11 +264,12 @@
 
         <!-- Visual Stacked Bar -->
         <div class="cost-stacked-bar" title="Tỷ trọng chi phí trong giá vốn">
-          <div id="barFilament" class="bar-segment" style="width: 40%; background: #06b6d4;" title="Chi phí nhựa"></div>
-          <div id="barDepreciation" class="bar-segment" style="width: 25%; background: #8b5cf6;" title="Khấu hao máy"></div>
-          <div id="barLabor" class="bar-segment" style="width: 20%; background: #10b981;" title="Tiền công"></div>
-          <div id="barElectricity" class="bar-segment" style="width: 8%; background: #f59e0b;" title="Tiền điện"></div>
-          <div id="barRisk" class="bar-segment" style="width: 7%; background: #f43f5e;" title="Rủi ro in lỗi"></div>
+          <div id="barFilament" class="bar-segment" style="width: 35%; background: #06b6d4;" title="Chi phí nhựa"></div>
+          <div id="barDepreciation" class="bar-segment" style="width: 20%; background: #8b5cf6;" title="Khấu hao máy"></div>
+          <div id="barLabor" class="bar-segment" style="width: 18%; background: #10b981;" title="Tiền công"></div>
+          <div id="barElectricity" class="bar-segment" style="width: 7%; background: #f59e0b;" title="Tiền điện"></div>
+          <div id="barRisk" class="bar-segment" style="width: 5%; background: #f43f5e;" title="Rủi ro in lỗi"></div>
+          <div id="barAccessories" class="bar-segment" style="width: 15%; background: #eab308;" title="Phụ kiện mua ngoài"></div>
         </div>
 
         <!-- Cost Breakdown List -->
@@ -276,6 +326,17 @@
             <div class="cost-item-right">
               <span id="costRiskText" class="cost-val">0 đ</span>
               <span id="pctRiskText" class="cost-pct">0%</span>
+            </div>
+          </div>
+
+          <div class="cost-item" id="rowCostAccessories">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #eab308;"></div>
+              <span class="cost-name">Phụ kiện mua ngoài (Đèn LED, mica...)</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costAccessoriesText" class="cost-val">0 đ</span>
+              <span id="pctAccessoriesText" class="cost-pct">0%</span>
             </div>
           </div>
         </div>
@@ -445,16 +506,27 @@
           </div>
 
           <h4 style="font-size: 13px; text-transform: uppercase; color: #38bdf8; margin-bottom: 12px; letter-spacing: 0.5px;">
-            5. Tỷ Suất Định Giá
+            5. Tỷ Suất Định Giá In 3D
           </h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
             <div class="form-group">
-              <label for="cfgMarkupWholesale" class="form-label">Hệ số giá sỉ (x lần vốn)</label>
+              <label for="cfgMarkupWholesale" class="form-label">Hệ số in sỉ (x lần vốn)</label>
               <input type="number" id="cfgMarkupWholesale" class="form-control" step="0.1" min="1.1" max="3.0">
             </div>
             <div class="form-group">
-              <label for="cfgMarkupRetail" class="form-label">Hệ số giá bán lẻ (x lần vốn)</label>
+              <label for="cfgMarkupRetail" class="form-label">Hệ số in lẻ (x lần vốn)</label>
               <input type="number" id="cfgMarkupRetail" class="form-control" step="0.1" min="1.3" max="5.0">
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; text-transform: uppercase; color: #facc15; margin-bottom: 12px; letter-spacing: 0.5px;">
+            6. Phụ Kiện Ngoài & Lắp Ráp (Đèn LED, Mica, Nguồn...)
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="cfgAccessoryMarkup" class="form-label">Hệ số bán lẻ phụ kiện (bù công hàn, đấu nối, lắp ráp)</label>
+              <input type="number" id="cfgAccessoryMarkup" class="form-control" step="0.05" min="1.0" max="2.5" value="1.25">
+              <small style="color: var(--text-dim); font-size: 11px; margin-top: 4px; display: block;">Mặc định x1.25 (ví dụ: Mua bộ LED 40.000đ tính khách 50.000đ để bù công đấu dây, công tắc và rủi ro hỏng đèn).</small>
             </div>
           </div>
         </form>

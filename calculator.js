@@ -27,6 +27,9 @@ const PricingCalculator = {
     // Rủi ro in hỏng / đền bù
     failRiskPercent: 5,             // Tỷ lệ dự phòng rủi ro in lỗi/hỏng (5%)
 
+    // Phụ kiện mua ngoài & Vật tư lắp ráp (Đèn LED, mica tản sáng, ốc vít, nam châm...)
+    accessoryMarkup: 1.25,          // Hệ số giá bán lẻ phụ kiện (x1.25 bù công hàn dây, test điện, dán lắp ráp)
+
     // Hệ số định giá bán
     markupWholesale: 1.5,           // Hệ số giá sỉ / đại lý (x1.5 = Lời ~33% trên giá bán)
     markupRetail: 2.2,              // Hệ số giá bán lẻ (x2.2 = Lời ~55% trên giá bán)
@@ -81,7 +84,7 @@ const PricingCalculator = {
   /**
    * Tính toán toàn bộ chi phí và báo giá từ dữ liệu G-code
    * @param {Object} gcodeData - Dữ liệu trích xuất từ GCodeParser
-   * @param {Object} [customConfig] - Cấu hình ghi đè nếu có
+   * @param {Object} [customConfig] - Cấu hình ghi đè nếu có (bao gồm costAccessories, accessoriesDetail...)
    * @returns {Object} Báo cáo chi phí chi tiết
    */
   calculate(gcodeData, customConfig = null) {
@@ -108,43 +111,55 @@ const PricingCalculator = {
     const laborHours = (cfg.laborTimeMinutes / 60);
     const costLabor = Math.round(laborHours * cfg.laborRatePerHour);
 
-    // 5. Tổng chi phí trực tiếp & gián tiếp (Subtotal)
-    const subtotalCost = costFilament + costElectricity + costDepreciation + costLabor;
+    // 5. Chi phí mua phụ kiện & vật tư ngoài (Đèn LED, mica, ốc, nam châm...)
+    const costAccessories = Math.max(0, parseFloat(customConfig?.costAccessories ?? cfg.costAccessories ?? 0));
+    const accessoriesDetail = (customConfig?.accessoriesDetail ?? cfg.accessoriesDetail ?? '').trim();
+    const accessoryMarkup = parseFloat(customConfig?.accessoryMarkup ?? cfg.accessoryMarkup ?? 1.25);
 
-    // 6. Quỹ dự phòng rủi ro in lỗi (Fail Buffer)
-    const costFailRisk = Math.round(subtotalCost * (cfg.failRiskPercent / 100));
+    // 6. Tổng chi phí in cơ bản (Filament + Điện + Khấu hao + Công in)
+    const subtotalPrintCost = costFilament + costElectricity + costDepreciation + costLabor;
 
-    // 7. GIÁ VỐN TOÀN DIỆN (Total Base Cost - Mốc hòa vốn chuẩn)
-    const totalBaseCost = Math.round(subtotalCost + costFailRisk);
+    // 7. Quỹ dự phòng rủi ro in lỗi (chỉ tính trên phần in 3D, không phạt lên tiền mua linh kiện ngoài)
+    const costFailRisk = Math.round(subtotalPrintCost * (cfg.failRiskPercent / 100));
 
-    // 8. GIÁ BÁN SỈ ĐỀ XUẤT (Wholesale Price)
-    const priceWholesaleRaw = totalBaseCost * cfg.markupWholesale;
+    // 8. GIÁ VỐN TOÀN DIỆN (Đã gồm in + rủi ro + tiền mua phụ kiện)
+    const totalBaseCost = Math.round(subtotalPrintCost + costFailRisk + costAccessories);
+
+    // 9. GIÁ BÁN SỈ ĐỀ XUẤT (Wholesale Price)
+    // In 3D sỉ theo markupWholesale, phụ kiện sỉ tính giá vốn + 10%
+    const wholesalePrint = (subtotalPrintCost + costFailRisk) * cfg.markupWholesale;
+    const wholesaleAcc = costAccessories * 1.1;
+    const priceWholesaleRaw = wholesalePrint + wholesaleAcc;
     const priceWholesale = Math.round(priceWholesaleRaw / 1000) * 1000; // Làm tròn đến nghìn đồng
 
-    // 9. GIÁ BÁN LẺ ĐỀ XUẤT (Retail Price)
-    const baseRetail = totalBaseCost * cfg.markupRetail;
+    // 10. GIÁ BÁN LẺ ĐỀ XUẤT (Retail Price)
+    // In 3D lẻ theo markupRetail, phụ kiện lẻ theo accessoryMarkup (mặc định x1.25 bù công hàn dán lắp ráp)
+    const retailPrint = (subtotalPrintCost + costFailRisk) * cfg.markupRetail;
+    const retailAcc = costAccessories * accessoryMarkup;
+    const baseRetail = retailPrint + retailAcc;
     const discountedRetail = baseRetail * (1 - (cfg.discountPercent / 100));
     const priceRetail = Math.round(discountedRetail / 1000) * 1000; // Làm tròn đến nghìn đồng
 
-    // 10. Lợi nhuận ròng & Tỷ suất lợi nhuận (Net Profit)
+    // 11. Lợi nhuận ròng & Tỷ suất lợi nhuận (Net Profit)
     const netProfitRetail = Math.max(0, priceRetail - totalBaseCost);
     const profitMarginRetailPercent = priceRetail > 0 ? Number(((netProfitRetail / priceRetail) * 100).toFixed(1)) : 0;
 
     const netProfitWholesale = Math.max(0, priceWholesale - totalBaseCost);
     const profitMarginWholesalePercent = priceWholesale > 0 ? Number(((netProfitWholesale / priceWholesale) * 100).toFixed(1)) : 0;
 
-    // 11. Các chỉ số tham chiếu thị trường (Market Benchmarks)
+    // 12. Các chỉ số tham chiếu thị trường (Market Benchmarks)
     const pricePerGram = weightGrams > 0 ? Math.round(priceRetail / weightGrams) : 0;
     const pricePerHour = timeHours > 0 ? Math.round(priceRetail / timeHours) : 0;
 
-    // 12. Tỷ trọng các thành phần trong giá vốn (để vẽ biểu đồ)
+    // 13. Tỷ trọng các thành phần trong giá vốn (để vẽ biểu đồ)
     const baseTotalSafe = totalBaseCost || 1;
     const breakdownPercentages = {
       filament: Number(((costFilament / baseTotalSafe) * 100).toFixed(1)),
       electricity: Number(((costElectricity / baseTotalSafe) * 100).toFixed(1)),
       depreciation: Number(((costDepreciation / baseTotalSafe) * 100).toFixed(1)),
       labor: Number(((costLabor / baseTotalSafe) * 100).toFixed(1)),
-      risk: Number(((costFailRisk / baseTotalSafe) * 100).toFixed(1))
+      risk: Number(((costFailRisk / baseTotalSafe) * 100).toFixed(1)),
+      accessories: Number(((costAccessories / baseTotalSafe) * 100).toFixed(1))
     };
 
     return {
@@ -160,6 +175,9 @@ const PricingCalculator = {
       costDepreciation,
       costLabor,
       costFailRisk,
+      costAccessories,
+      accessoriesDetail,
+      accessoryMarkup,
       totalBaseCost,
 
       // Giá đề xuất

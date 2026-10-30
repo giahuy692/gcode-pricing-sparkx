@@ -42,6 +42,8 @@ const ExcelExporter = {
       'Khấu Hao Máy (đ)',
       'Tiền Công (đ)',
       'Dự Phòng Rủi Ro (đ)',
+      'Tiền Phụ Kiện (đ)',
+      'Chi Tiết Phụ Kiện',
       'GIÁ VỐN TOÀN DIỆN (đ)',
       'GIÁ SỈ (đ)',
       'GIÁ BÁN LẺ (đ)',
@@ -58,6 +60,7 @@ const ExcelExporter = {
     let totalElectricityCost = 0;
     let totalDepreciation = 0;
     let totalLaborCost = 0;
+    let totalAccessoriesCost = 0;
     let totalBaseCost = 0;
     let totalRetailRevenue = 0;
     let totalNetProfit = 0;
@@ -71,6 +74,7 @@ const ExcelExporter = {
       totalElectricityCost += calc.costElectricity || 0;
       totalDepreciation += calc.costDepreciation || 0;
       totalLaborCost += calc.costLabor || 0;
+      totalAccessoriesCost += calc.costAccessories || 0;
       totalBaseCost += calc.totalBaseCost || 0;
       totalRetailRevenue += calc.priceRetail || 0;
       totalNetProfit += calc.netProfitRetail || 0;
@@ -90,6 +94,8 @@ const ExcelExporter = {
         calc.costDepreciation || 0,
         calc.costLabor || 0,
         calc.costFailRisk || 0,
+        calc.costAccessories || 0,
+        calc.accessoriesDetail || '',
         calc.totalBaseCost || 0,
         calc.priceWholesale || 0,
         calc.priceRetail || 0,
@@ -112,6 +118,8 @@ const ExcelExporter = {
       Math.round(totalElectricityCost),
       Math.round(totalDepreciation),
       Math.round(totalLaborCost),
+      '',
+      Math.round(totalAccessoriesCost),
       '',
       Math.round(totalBaseCost),
       '',
@@ -138,6 +146,9 @@ const ExcelExporter = {
       { wch: 14 },  // Tiền điện
       { wch: 16 },  // Khấu hao
       { wch: 14 },  // Tiền công
+      { wch: 14 },  // Rủi ro
+      { wch: 16 },  // Tiền phụ kiện
+      { wch: 24 },  // Chi tiết phụ kiện
       { wch: 16 },  // Quỹ rủi ro
       { wch: 20 },  // Giá vốn
       { wch: 16 },  // Giá sỉ
