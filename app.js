@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentParsedData: null,
     currentCalculation: null,
     orders: [],
+    accessories: [], // Danh sách các món phụ kiện [{ id, name, unitCost, quantity }]
     config: PricingCalculator.getConfig()
   };
 
@@ -64,9 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const quickRetailMarkup = document.getElementById('quickRetailMarkup');
   const liveMarkup = document.getElementById('liveMarkup');
 
-  // Accessories Elements
-  const inputAccessoryCost = document.getElementById('inputAccessoryCost');
-  const inputAccessoryDetail = document.getElementById('inputAccessoryDetail');
+  // Accessories Elements (Hỗ trợ nhiều phụ kiện cho 1 sản phẩm)
+  const accessoriesListContainer = document.getElementById('accessoriesListContainer');
+  const btnAddAccessoryRow = document.getElementById('btnAddAccessoryRow');
   const badgeAccessoryCost = document.getElementById('badgeAccessoryCost');
   const btnClearAccessories = document.getElementById('btnClearAccessories');
   const accQuickChips = document.querySelectorAll('.acc-quick-chip');
@@ -162,20 +163,96 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Update Pricing Calculation & UI ---
+  // --- Render Accessories List ---
+  function renderAccessoriesList() {
+    if (!accessoriesListContainer) return;
+    accessoriesListContainer.innerHTML = '';
+
+    if (state.accessories.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'accessory-empty-msg';
+      emptyDiv.textContent = 'Chưa thêm phụ kiện nào. Hãy bấm "➕ Thêm Món" hoặc chọn gợi ý nhanh bên dưới!';
+      accessoriesListContainer.appendChild(emptyDiv);
+      return;
+    }
+
+    state.accessories.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'accessory-item-row';
+      row.dataset.id = item.id;
+
+      const subtotal = (item.unitCost || 0) * (item.quantity || 1);
+
+      row.innerHTML = `
+        <input type="text" class="form-control acc-input-name" value="${item.name || ''}" placeholder="Tên phụ kiện..." style="font-size: 12px; padding: 4px 8px;">
+        <input type="number" class="form-control acc-input-cost" value="${item.unitCost || 0}" min="0" step="1000" placeholder="0" style="font-size: 12px; padding: 4px 6px; font-family: var(--font-mono); font-weight: 600;">
+        <input type="number" class="form-control acc-input-qty" value="${item.quantity || 1}" min="1" step="1" style="font-size: 12px; padding: 4px 6px; font-family: var(--font-mono); font-weight: 600; text-align: center;">
+        <div class="acc-row-subtotal" style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: #facc15; text-align: right;">${PricingCalculator.formatCurrency(subtotal)}</div>
+        <button type="button" class="btn btn-secondary btn-sm acc-btn-del" title="Xóa món này" style="padding: 2px 6px; font-size: 11px;">❌</button>
+      `;
+
+      // Listeners
+      const inputName = row.querySelector('.acc-input-name');
+      const inputCost = row.querySelector('.acc-input-cost');
+      const inputQty = row.querySelector('.acc-input-qty');
+      const subtotalDiv = row.querySelector('.acc-row-subtotal');
+      const btnDel = row.querySelector('.acc-btn-del');
+
+      inputName.addEventListener('input', () => {
+        item.name = inputName.value.trim();
+        recalculateAndRender();
+      });
+
+      inputCost.addEventListener('input', () => {
+        item.unitCost = Math.max(0, parseInt(inputCost.value, 10) || 0);
+        const newSub = item.unitCost * (item.quantity || 1);
+        subtotalDiv.textContent = PricingCalculator.formatCurrency(newSub);
+        recalculateAndRender();
+      });
+
+      inputQty.addEventListener('input', () => {
+        item.quantity = Math.max(1, parseInt(inputQty.value, 10) || 1);
+        const newSub = (item.unitCost || 0) * item.quantity;
+        subtotalDiv.textContent = PricingCalculator.formatCurrency(newSub);
+        recalculateAndRender();
+      });
+
+      btnDel.addEventListener('click', () => {
+        state.accessories = state.accessories.filter(a => a.id !== item.id);
+        renderAccessoriesList();
+        recalculateAndRender();
+        showToast(`Đã xóa: ${item.name || 'phụ kiện'}`);
+      });
+
+      accessoriesListContainer.appendChild(row);
+    });
+  }
+
+  // --- Update Pricing Calculation & UI ---
   function recalculateAndRender() {
     if (!state.currentParsedData) return;
 
     // Lấy giá trị trực tiếp từ quick tuning sliders & accessory inputs
     const currentQuickFilament = Math.max(0, parseInt(quickFilamentCost.value, 10) || 0);
     const currentQuickMarkup = parseFloat(quickRetailMarkup.value);
-    const currentAccessoryCost = Math.max(0, parseInt(inputAccessoryCost?.value || '0', 10) || 0);
-    const currentAccessoryDetail = (inputAccessoryDetail?.value || '').trim();
+
+    // Tính tổng chi phí phụ kiện từ danh sách nhiều món
+    const totalAccessoryCost = state.accessories.reduce((sum, item) => {
+      const c = Math.max(0, parseInt(item.unitCost, 10) || 0);
+      const q = Math.max(1, parseInt(item.quantity, 10) || 1);
+      return sum + (c * q);
+    }, 0);
+
+    const accessoriesDetail = state.accessories
+      .filter(item => item.name && (item.unitCost > 0))
+      .map(item => `${item.name}${item.quantity > 1 ? ` (x${item.quantity})` : ''}: ${PricingCalculator.formatCurrency((item.unitCost || 0) * (item.quantity || 1))}`)
+      .join(' + ');
 
     const overrides = {
       filamentCostPerKg: currentQuickFilament,
       markupRetail: currentQuickMarkup,
-      costAccessories: currentAccessoryCost,
-      accessoriesDetail: currentAccessoryDetail,
+      costAccessories: totalAccessoryCost,
+      accessoriesDetail: accessoriesDetail,
       accessoryMarkup: state.config?.accessoryMarkup || 1.25
     };
 
@@ -228,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
       pctAccessoriesText.textContent = `${calc.breakdownPercentages.accessories || 0}%`;
     }
     if (badgeAccessoryCost) {
-      badgeAccessoryCost.textContent = PricingCalculator.formatCurrency(calc.costAccessories);
+      badgeAccessoryCost.textContent = `${PricingCalculator.formatCurrency(calc.costAccessories)} (${state.accessories.length} món)`;
     }
 
     // Cập nhật thanh tỷ trọng (stacked bar)
@@ -360,46 +437,53 @@ document.addEventListener('DOMContentLoaded', () => {
     recalculateAndRender();
   });
 
-  // --- Accessories Event Listeners ---
-  if (inputAccessoryCost) {
-    inputAccessoryCost.addEventListener('input', () => {
+  // --- Multi-Accessories Event Listeners ---
+  if (btnAddAccessoryRow) {
+    btnAddAccessoryRow.addEventListener('click', () => {
+      state.accessories.push({
+        id: 'acc_' + Date.now() + Math.random().toString(36).substr(2, 3),
+        name: 'Phụ kiện mới',
+        unitCost: 10000,
+        quantity: 1
+      });
+      renderAccessoriesList();
       recalculateAndRender();
-    });
-  }
-
-  if (inputAccessoryDetail) {
-    inputAccessoryDetail.addEventListener('input', () => {
-      if (state.currentCalculation) {
-        state.currentCalculation.accessoriesDetail = inputAccessoryDetail.value.trim();
-      }
+      showToast('Đã thêm 1 dòng phụ kiện mới');
     });
   }
 
   if (btnClearAccessories) {
     btnClearAccessories.addEventListener('click', () => {
-      if (inputAccessoryCost) inputAccessoryCost.value = 0;
-      if (inputAccessoryDetail) inputAccessoryDetail.value = '';
+      if (state.accessories.length === 0) return;
+      state.accessories = [];
+      renderAccessoriesList();
       recalculateAndRender();
-      showToast('Đã đặt lại phụ kiện về 0đ');
+      showToast('Đã xóa toàn bộ phụ kiện');
     });
   }
 
   accQuickChips.forEach(chip => {
     chip.addEventListener('click', () => {
-      const addCost = parseInt(chip.getAttribute('data-cost') || '0', 10);
-      const name = chip.getAttribute('data-name') || '';
-      
-      const currentVal = parseInt(inputAccessoryCost.value || '0', 10) || 0;
-      inputAccessoryCost.value = currentVal + addCost;
+      const name = chip.getAttribute('data-name') || 'Phụ kiện';
+      const cost = parseInt(chip.getAttribute('data-cost') || '0', 10);
+      const qty = parseInt(chip.getAttribute('data-qty') || '1', 10);
 
-      const currentDetail = inputAccessoryDetail.value.trim();
-      if (!currentDetail) {
-        inputAccessoryDetail.value = name;
-      } else if (!currentDetail.includes(name)) {
-        inputAccessoryDetail.value = `${currentDetail} + ${name}`;
+      // Nếu món đã có trong danh sách thì tăng số lượng
+      const existing = state.accessories.find(a => a.name === name);
+      if (existing) {
+        existing.quantity = (existing.quantity || 1) + qty;
+      } else {
+        state.accessories.push({
+          id: 'acc_' + Date.now() + Math.random().toString(36).substr(2, 3),
+          name: name,
+          unitCost: cost,
+          quantity: qty
+        });
       }
+
+      renderAccessoriesList();
       recalculateAndRender();
-      showToast(`+${PricingCalculator.formatCurrency(addCost)}: ${name}`);
+      showToast(`+ ${name} (${PricingCalculator.formatCurrency(cost * qty)})`);
     });
   });
 
@@ -441,6 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
       filename: state.currentParsedData.filename,
       status: selectOrderStatus.value,
       notes: inputOrderNotes.value.trim(),
+      accessories: JSON.parse(JSON.stringify(state.accessories || [])),
       calculation: { ...state.currentCalculation }
     };
 
@@ -470,8 +555,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const gcode = calc.gcode;
 
     let accessoryLine = '';
-    if (calc.costAccessories > 0) {
-      accessoryLine = `\n💡 Phụ kiện đi kèm: ${calc.accessoriesDetail || 'Vật tư mua ngoài'} (+${PricingCalculator.formatCurrency(calc.costAccessories)})`;
+    if (state.accessories && state.accessories.length > 0 && calc.costAccessories > 0) {
+      const listStr = state.accessories
+        .map(a => `• ${a.name}${a.quantity > 1 ? ` (x${a.quantity})` : ''}: ${PricingCalculator.formatCurrency((a.unitCost || 0) * (a.quantity || 1))}`)
+        .join('\n');
+      accessoryLine = `\n\n💡 PHỤ KIỆN LẮP RÁP (${PricingCalculator.formatCurrency(calc.costAccessories)}):\n${listStr}`;
     }
 
     const quoteText = 
@@ -557,8 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
 
+      const accCount = (order.accessories && order.accessories.length) || (calc.costAccessories > 0 ? 1 : 0);
       const accTag = (calc.costAccessories > 0)
-        ? `<div style="font-size: 11px; color: #facc15; margin-top: 2px;">💡 Phụ kiện: +${PricingCalculator.formatCurrency(calc.costAccessories)} (${calc.accessoriesDetail || 'Linh kiện ngoài'})</div>`
+        ? `<div style="font-size: 11px; color: #facc15; margin-top: 2px;" title="${calc.accessoriesDetail || ''}">💡 Phụ kiện (${accCount} món): +${PricingCalculator.formatCurrency(calc.costAccessories)}</div>`
         : '';
 
       tr.innerHTML = `
@@ -879,6 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Initialize App ---
+  renderAccessoriesList();
   loadOrders();
   updateGSheetStatusUI();
 

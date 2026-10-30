@@ -870,3 +870,42 @@ select.form-control {
   margin-bottom: 10px;
   opacity: 0.6;
 }
+
+/* Multi-accessory items list */
+.accessory-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.accessory-item-row {
+  display: grid;
+  grid-template-columns: 1.8fr 1.1fr 65px 1fr 32px;
+  gap: 8px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.accessory-item-row:hover {
+  border-color: rgba(234, 179, 8, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.accessory-empty-msg {
+  text-align: center;
+  padding: 12px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
