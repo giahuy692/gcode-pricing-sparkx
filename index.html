@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-Code CostMaster 3D - Tính Giá In 3D Tự Động & Xuất Excel</title>
+  <meta name="description" content="Ứng dụng tự động phân tích file G-code từ Cura, Creality Print, Bambu Studio để tính giá in 3D chính xác, không sợ lỗ, tối ưu lợi nhuận và xuất file Excel.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Local SheetJS (XLSX) Library -->
+  <script src="xlsx.full.min.js"></script>
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo">🖨️</div>
+        <div>
+          <div style="display: flex; align-items: center;">
+            <h1 class="brand-title">G-Code CostMaster 3D</h1>
+            <span class="brand-badge">SPARKX i7 PRO</span>
+          </div>
+          <p class="brand-subtitle">Tối ưu cho máy in SparkX i7 • Định giá không lỗ • Đồng bộ Google Sheets & Excel</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnOpenGSheetModal" class="btn btn-outline-cyan" title="Kết nối đồng bộ vào 1 file Google Sheets duy nhất">
+          <span id="gsheetStatusDot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#94a3b8; margin-right:4px;"></span>
+          ☁️ Google Sheets
+        </button>
+        <button id="btnOpenSettings" class="btn btn-secondary" title="Cài đặt chi phí vận hành">
+          ⚙️ Cấu Hình Chi Phí
+        </button>
+        <button id="btnExportAllExcel" class="btn btn-success" title="Xuất toàn bộ lịch sử ra file Excel">
+          📊 Xuất File Excel (.xlsx)
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="main-grid">
+      <!-- Left Column: G-code Upload & Parsed Specs -->
+      <section class="glass-panel" aria-label="Khu vực tải file G-code">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <span class="icon">📁</span> Nạp File G-Code In 3D
+          </h2>
+          <span id="detectedSlicerBadge" class="tag" style="color: var(--accent-cyan); display: none;">Slicer</span>
+        </div>
+
+        <!-- Drag & Drop Box -->
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Kéo thả hoặc chọn file G-code">
+          <input type="file" id="fileInput" class="file-input-hidden" accept=".gcode,.nc,.gco,.txt">
+          <div class="dropzone-icon">🚀</div>
+          <div class="dropzone-title">Kéo & thả file .GCODE vào đây</div>
+          <div class="dropzone-desc">hoặc nhấp chuột để duyệt file từ máy tính của bạn</div>
+          <div class="file-tags">
+            <span class="tag">UltiMaker Cura</span>
+            <span class="tag">Creality Print</span>
+            <span class="tag">Bambu Studio</span>
+            <span class="tag">OrcaSlicer / Prusa</span>
+          </div>
+        </div>
+
+        <!-- Demo Files Bar -->
+        <div class="demo-buttons-bar">
+          <span class="demo-buttons-label">Thử nhanh với mẫu:</span>
+          <div class="demo-actions">
+            <button id="btnLoadCuraDemo" class="btn btn-secondary btn-sm" title="Mô hình Rồng khớp nối cắt lớp bằng Cura">
+              🐉 Mẫu Cura (Rồng 4h)
+            </button>
+            <button id="btnLoadCrealityDemo" class="btn btn-secondary btn-sm" title="Mô hình Kẹp điện thoại cắt lớp bằng Creality Print">
+              📱 Mẫu Creality (Giá đỡ 1h45p)
+            </button>
+          </div>
+        </div>
+
+        <!-- Parsed G-code Metrics Grid -->
+        <div class="gcode-metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Thời Gian In</div>
+            <div id="valPrintTime" class="metric-value">--</div>
+            <div id="valTimeHours" class="metric-sub">-- giờ</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Khối Lượng Nhựa</div>
+            <div id="valFilamentGrams" class="metric-value">--</div>
+            <div id="valFilamentMeters" class="metric-sub">-- mét</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Máy In & Slicer</div>
+            <div id="valPrinterModel" class="metric-value" style="font-size: 14px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">--</div>
+            <div id="valSlicerName" class="metric-sub">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Số Lớp / Layer</div>
+            <div id="valLayers" class="metric-value">--</div>
+            <div id="valLayerHeight" class="metric-sub">Cao 0.20 mm</div>
+          </div>
+        </div>
+
+        <!-- Print Process Profile Keeper Card (Chống mất cài đặt khi Creality Print cập nhật) -->
+        <div class="instructions-card" style="margin-top: 0; margin-bottom: 20px; background: rgba(6, 182, 212, 0.04); border-color: rgba(6, 182, 212, 0.2);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                <span>🛡️ Cài Đặt In Của File (Print Process Profile)</span>
+                <span class="tag" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3); font-size: 10px;">ĐÃ BẢO LƯU</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+                Tự động lưu trữ thông số cắt lớp. Khi Creality Print cập nhật làm mất cài đặt, bạn có thể xem lại hoặc tải file dự phòng!
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button id="btnDownloadProfileIni" class="btn btn-outline-cyan btn-sm" type="button" title="Tải file cấu hình dự phòng .ini để lưu vào máy">
+                📥 Tải File Profile (.ini)
+              </button>
+              <button id="btnCopyProfileText" class="btn btn-secondary btn-sm" type="button" title="Sao chép toàn bộ thông số in dạng văn bản">
+                📋 Copy
+              </button>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px;">
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Nhiệt độ Đầu & Bàn</span>
+              <div id="procTempDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">210°C / 60°C</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Mật Độ Infill & Kiểu</span>
+              <div id="procInfillDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">20% (Gyroid)</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Tốc Độ In (Speed)</span>
+              <div id="procSpeedDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">80 mm/s</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Rút Nhựa (Retract)</span>
+              <div id="procRetractDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">1.2mm @ 45mm/s</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Lớp Thành (Wall)</span>
+              <div id="procWallDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">3 lớp (1.2mm)</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-dim); font-size: 10px; text-transform: uppercase;">Hỗ Trợ (Support)</span>
+              <div id="procSupportDisplay" style="font-family: var(--font-mono); font-weight: 700; color: #f8fafc; margin-top: 2px;">Bật (Tree)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Job Status & Notes -->
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="selectOrderStatus" class="form-label">Trạng thái file</label>
+            <select id="selectOrderStatus" class="form-control">
+              <option value="Đã tính giá">Đã tính giá</option>
+              <option value="Đang in">Đang in</option>
+              <option value="Đã hoàn thành">Đã hoàn thành</option>
+              <option value="Lưu trữ mẫu">Lưu trữ mẫu</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="inputOrderNotes" class="form-label">Ghi chú kỹ thuật (tùy chọn)</label>
+            <input type="text" id="inputOrderNotes" class="form-control" placeholder="Mục đích in, ghi chú file...">
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Live Pricing & Strategy -->
+      <section class="glass-panel" aria-label="Báo cáo chi phí và định giá">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <span class="icon">💰</span> Định Giá & Biên Lợi Nhuận
+          </h2>
+          <button id="btnSaveToHistory" class="btn btn-primary btn-sm">
+            💾 Lưu Vào Đơn Hàng
+          </button>
+        </div>
+
+        <!-- Highlight Retail Price Card -->
+        <div class="quote-highlight-card">
+          <div class="retail-price-display">
+            <div class="retail-label">GIÁ BÁN LẺ ĐỀ XUẤT CHO KHÁCH</div>
+            <div id="dispRetailPrice" class="retail-amount">0 đ</div>
+            <div class="retail-margin-badge">
+              <span>Lợi nhuận ròng:</span>
+              <strong id="dispRetailProfit">0 đ</strong>
+              (<span id="dispRetailMargin">0%</span>)
+            </div>
+          </div>
+
+          <div class="price-dual-row">
+            <div class="dual-box">
+              <div class="dual-box-label">Giá Vốn Toàn Phần (Hòa vốn)</div>
+              <div id="dispBaseCost" class="dual-box-val" style="color: #cbd5e1;">0 đ</div>
+              <div class="dual-box-sub">Đã gồm công + điện + rủi ro</div>
+            </div>
+            <div class="dual-box">
+              <div class="dual-box-label">Giá Sỉ / Đại Lý / CTV</div>
+              <div id="dispWholesalePrice" class="dual-box-val" style="color: #fbbf24;">0 đ</div>
+              <div class="dual-box-sub">Lãi <span id="dispWholesaleProfit">0 đ</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visual Stacked Bar -->
+        <div class="cost-stacked-bar" title="Tỷ trọng chi phí trong giá vốn">
+          <div id="barFilament" class="bar-segment" style="width: 40%; background: #06b6d4;" title="Chi phí nhựa"></div>
+          <div id="barDepreciation" class="bar-segment" style="width: 25%; background: #8b5cf6;" title="Khấu hao máy"></div>
+          <div id="barLabor" class="bar-segment" style="width: 20%; background: #10b981;" title="Tiền công"></div>
+          <div id="barElectricity" class="bar-segment" style="width: 8%; background: #f59e0b;" title="Tiền điện"></div>
+          <div id="barRisk" class="bar-segment" style="width: 7%; background: #f43f5e;" title="Rủi ro in lỗi"></div>
+        </div>
+
+        <!-- Cost Breakdown List -->
+        <div class="cost-breakdown-list">
+          <div class="cost-item">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #06b6d4;"></div>
+              <span class="cost-name">Tiền nhựa (gồm hao hụt 5%)</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costFilamentText" class="cost-val">0 đ</span>
+              <span id="pctFilamentText" class="cost-pct">0%</span>
+            </div>
+          </div>
+
+          <div class="cost-item">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #f59e0b;"></div>
+              <span class="cost-name">Tiền điện tiêu thụ</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costElectricityText" class="cost-val">0 đ</span>
+              <span id="pctElectricityText" class="cost-pct">0%</span>
+            </div>
+          </div>
+
+          <div class="cost-item">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #8b5cf6;"></div>
+              <span class="cost-name">Khấu hao máy in & bảo dưỡng</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costDepreciationText" class="cost-val">0 đ</span>
+              <span id="pctDepreciationText" class="cost-pct">0%</span>
+            </div>
+          </div>
+
+          <div class="cost-item">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #10b981;"></div>
+              <span class="cost-name">Tiền công setup & xử lý nguội</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costLaborText" class="cost-val">0 đ</span>
+              <span id="pctLaborText" class="cost-pct">0%</span>
+            </div>
+          </div>
+
+          <div class="cost-item">
+            <div class="cost-item-left">
+              <div class="cost-dot" style="background: #f43f5e;"></div>
+              <span class="cost-name">Quỹ dự phòng rủi ro in hỏng</span>
+            </div>
+            <div class="cost-item-right">
+              <span id="costRiskText" class="cost-val">0 đ</span>
+              <span id="pctRiskText" class="cost-pct">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Tuning Controls -->
+        <div class="tuning-section">
+          <div class="tuning-title">
+            <span>⚡ Điều Chỉnh Báo Giá Nhanh</span>
+            <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">Cập nhật tức thì</span>
+          </div>
+          <div class="tuning-grid">
+            <div class="form-group">
+              <label for="quickFilamentCost" class="form-label">
+                <span>Giá nhựa (VNĐ/kg)</span>
+                <span id="liveFilamentPrice" class="value-live">220.000 đ</span>
+              </label>
+              <input type="range" id="quickFilamentCost" min="150000" max="600000" step="10000" value="220000" class="form-control" style="padding: 4px;">
+            </div>
+
+            <div class="form-group">
+              <label for="quickRetailMarkup" class="form-label">
+                <span>Hệ số giá bán lẻ</span>
+                <span id="liveMarkup" class="value-live">x2.2</span>
+              </label>
+              <input type="range" id="quickRetailMarkup" min="1.3" max="3.5" step="0.1" value="2.2" class="form-control" style="padding: 4px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Row -->
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button id="btnSyncCurrentToGSheet" class="btn btn-outline-cyan" style="flex: 1;" title="Gửi ngay dòng báo giá này lên file Google Sheets của bạn">
+            ☁️ Lưu Lên Google Sheet
+          </button>
+          <button id="btnCopyQuote" class="btn btn-secondary" style="flex: 1;" title="Sao chép nội dung báo giá chuyên nghiệp để gửi khách qua Zalo/Facebook">
+            📋 Copy Báo Giá Cho Khách
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Section: Order Management & History Table -->
+    <section class="glass-panel orders-section" aria-label="Quản lý danh sách đơn hàng đã tính">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">
+            <span class="icon">📑</span> Bảng Quản Lý Đơn Hàng & Báo Giá In 3D
+          </h2>
+          <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
+            Dữ liệu tự động lưu trên trình duyệt của bạn và có thể xuất file Excel bất kỳ lúc nào.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="text" id="searchOrdersInput" class="form-control" placeholder="🔍 Tìm theo tên file, ghi chú..." style="width: 200px; padding: 6px 12px; font-size: 12px;">
+          <button id="btnSyncAllToGSheet" class="btn btn-outline-cyan btn-sm" title="Đẩy toàn bộ lịch sử lên Google Sheet">
+            ☁️ Đồng Bộ Sheet
+          </button>
+          <button id="btnClearHistory" class="btn btn-secondary btn-sm" title="Xóa toàn bộ lịch sử">
+            🗑️ Xóa
+          </button>
+        </div>
+      </div>
+
+      <!-- Orders Table -->
+      <div class="table-responsive">
+        <table class="custom-table" id="ordersTable">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Ngày Tạo</th>
+              <th>Tên File G-Code & Cài Đặt In</th>
+              <th>Trọng Lượng</th>
+              <th>Thời Gian In</th>
+              <th>Giá Vốn</th>
+              <th>Giá Sỉ</th>
+              <th>Giá Bán Lẻ</th>
+              <th>Lợi Nhuận</th>
+              <th>Trạng Thái</th>
+              <th>Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <!-- Render dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="emptyOrdersState" class="empty-state" style="display: none;">
+        <div class="empty-icon">📂</div>
+        <p>Chưa có đơn hàng nào trong lịch sử.</p>
+        <p style="font-size: 12px;">Hãy nạp file G-code và bấm "Lưu Vào Đơn Hàng" để bắt đầu theo dõi!</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal: Cấu Hình Chi Phí Toàn Diện -->
+  <div id="settingsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="settingsModalTitle" class="modal-title">⚙️ Cấu Hình Chi Phí & Định Giá In 3D</h3>
+        <button id="btnCloseSettings" class="modal-close" aria-label="Đóng">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="settingsForm">
+          <h4 style="font-size: 13px; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 12px; letter-spacing: 0.5px;">
+            1. Nguyên Vật Liệu & Hao Hụt
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+            <div class="form-group">
+              <label for="cfgFilamentCost" class="form-label">Giá 1kg nhựa (VNĐ)</label>
+              <input type="number" id="cfgFilamentCost" class="form-control" step="1000" min="50000">
+            </div>
+            <div class="form-group">
+              <label for="cfgWastagePercent" class="form-label">Tỷ lệ hao hụt / support (%)</label>
+              <input type="number" id="cfgWastagePercent" class="form-control" step="1" min="0" max="50">
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; text-transform: uppercase; color: var(--accent-amber); margin-bottom: 12px; letter-spacing: 0.5px;">
+            2. Chi Phí Điện Năng
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+            <div class="form-group">
+              <label for="cfgMachinePower" class="form-label">Công suất máy in (Watt)</label>
+              <input type="number" id="cfgMachinePower" class="form-control" step="10" min="50" max="1000">
+            </div>
+            <div class="form-group">
+              <label for="cfgElectricityPrice" class="form-label">Giá điện (VNĐ/kWh)</label>
+              <input type="number" id="cfgElectricityPrice" class="form-control" step="100" min="1000">
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 12px; letter-spacing: 0.5px;">
+            3. Khấu Hao Máy & Bảo Trì
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+            <div class="form-group">
+              <label for="cfgMachinePrice" class="form-label">Giá mua máy (VNĐ)</label>
+              <input type="number" id="cfgMachinePrice" class="form-control" step="100000" min="1000000">
+            </div>
+            <div class="form-group">
+              <label for="cfgMachineLifespan" class="form-label">Tuổi thọ (Giờ in)</label>
+              <input type="number" id="cfgMachineLifespan" class="form-control" step="100" min="500">
+            </div>
+            <div class="form-group">
+              <label for="cfgMaintenancePerHour" class="form-label">Bảo dưỡng (VNĐ/giờ)</label>
+              <input type="number" id="cfgMaintenancePerHour" class="form-control" step="100" min="0">
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; text-transform: uppercase; color: var(--accent-emerald); margin-bottom: 12px; letter-spacing: 0.5px;">
+            4. Nhân Công & Rủi Ro In Lỗi
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+            <div class="form-group">
+              <label for="cfgLaborRate" class="form-label">Lương theo giờ (VNĐ)</label>
+              <input type="number" id="cfgLaborRate" class="form-control" step="1000" min="10000">
+            </div>
+            <div class="form-group">
+              <label for="cfgLaborTime" class="form-label">Thời gian/đơn (phút)</label>
+              <input type="number" id="cfgLaborTime" class="form-control" step="1" min="0">
+            </div>
+            <div class="form-group">
+              <label for="cfgFailRisk" class="form-label">Dự phòng rủi ro (%)</label>
+              <input type="number" id="cfgFailRisk" class="form-control" step="1" min="0" max="30">
+            </div>
+          </div>
+
+          <h4 style="font-size: 13px; text-transform: uppercase; color: #38bdf8; margin-bottom: 12px; letter-spacing: 0.5px;">
+            5. Tỷ Suất Định Giá
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="cfgMarkupWholesale" class="form-label">Hệ số giá sỉ (x lần vốn)</label>
+              <input type="number" id="cfgMarkupWholesale" class="form-control" step="0.1" min="1.1" max="3.0">
+            </div>
+            <div class="form-group">
+              <label for="cfgMarkupRetail" class="form-label">Hệ số giá bán lẻ (x lần vốn)</label>
+              <input type="number" id="cfgMarkupRetail" class="form-control" step="0.1" min="1.3" max="5.0">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnResetDefaultSettings" class="btn btn-secondary" type="button">Mặc Định Ban Đầu</button>
+        <button id="btnSaveSettings" class="btn btn-primary" type="button">Lưu Cấu Hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Kết Nối Google Sheets Duy Nhất -->
+  <div id="gsheetModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="gsheetModalTitle">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="gsheetModalTitle" class="modal-title">☁️ Lưu Trữ Tập Trung Vào 1 File Google Sheets</h3>
+        <button id="btnCloseGSheetModal" class="modal-close" aria-label="Đóng">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Thay vì tải nhiều file Excel rời rạc gây lộn xộn, toàn bộ dữ liệu báo giá sẽ được đẩy tự động vào <strong style="color: #38bdf8;">đúng 1 bảng tính Google Sheets duy nhất</strong> trên Google Drive của bạn.
+        </p>
+
+        <div class="form-group">
+          <label for="inputGSheetWebhook" class="form-label">
+            <span>URL Ứng dụng Web Google Apps Script (Webhook)</span>
+            <span id="gsheetConnectionLabel" class="value-live" style="color: #94a3b8;">Chưa kết nối</span>
+          </label>
+          <input type="url" id="inputGSheetWebhook" class="form-control" placeholder="https://script.google.com/macros/s/AKfycbx.../exec">
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+            <input type="checkbox" id="chkAutoSyncGSheet" style="width: 16px; height: 16px; accent-color: var(--accent-cyan);">
+            <span>Tự động đẩy đơn hàng lên Google Sheet mỗi khi bấm <strong>"Lưu Vào Đơn Hàng"</strong></span>
+          </label>
+        </div>
+
+        <!-- Instructions Box -->
+        <div class="instructions-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="font-size: 13px; color: #ffffff;">📖 Hướng dẫn thiết lập trong 60 giây (Chỉ cần làm 1 lần):</strong>
+            <button id="btnCopyScriptCode" class="btn btn-outline-cyan btn-sm" type="button" title="Sao chép đoạn mã Apps Script">
+              📋 Copy Mã Apps Script
+            </button>
+          </div>
+
+          <div class="instruction-step">
+            <span class="step-num">1</span>
+            <div>Tạo 1 file Google Sheet mới trên <a href="https://sheets.new" target="_blank" style="color: var(--accent-cyan); text-decoration: underline;">sheets.new</a> (ví dụ đặt tên: <em>"Quản Lý Đơn Hàng In 3D"</em>).</div>
+          </div>
+
+          <div class="instruction-step">
+            <span class="step-num">2</span>
+            <div>Vào menu: <strong>Tiện ích mở rộng (Extensions)</strong> &rarr; <strong>Apps Script</strong>. Xóa hết mã cũ trong đó và dán mã đã copy vào &rarr; Nhấn <strong>Lưu</strong> (Ctrl+S).</div>
+          </div>
+
+          <div class="instruction-step">
+            <span class="step-num">3</span>
+            <div>Bấm <strong>Triển khai (Deploy)</strong> &rarr; <strong>Tùy chọn triển khai mới (New deployment)</strong> &rarr; Chọn <strong>Ứng dụng web (Web app)</strong>:
+              <ul style="margin-left: 18px; margin-top: 4px; color: var(--text-dim);">
+                <li>Ai có quyền truy cập (Who has access): Chọn <strong>Bất kỳ ai (Anyone)</strong>.</li>
+                <li>Bấm <strong>Triển khai</strong> &rarr; Sao chép <strong>URL ứng dụng web</strong> và dán vào ô bên trên!</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnTestGSheet" class="btn btn-secondary" type="button">🧪 Gửi 1 Dòng Thử Nghiệm</button>
+        <button id="btnSaveGSheetConfig" class="btn btn-primary" type="button">Lưu Cấu Hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Application Logic Scripts -->
+  <script src="parser.js"></script>
+  <script src="calculator.js"></script>
+  <script src="excel.js"></script>
+  <script src="googlesheets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
