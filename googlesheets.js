@@ -52,6 +52,28 @@ const GoogleSheetsSync = {
   },
 
   /**
+   * Kiểm tra xem Webhook URL có mở quyền "Bất kỳ ai (Anyone)" hay không
+   */
+  async checkWebhookStatus(url) {
+    const targetUrl = (url || this.getWebhookUrl() || '').trim();
+    if (!targetUrl) return { ok: false, message: 'Chưa có URL Webhook!' };
+    
+    try {
+      // Thử gọi GET với mode cors. Nếu Webhook mở "Anyone", CORS sẽ cho phép nhận phản hồi từ script.googleusercontent.com
+      const res = await fetch(targetUrl, { method: 'GET', mode: 'cors' });
+      const data = await res.json().catch(() => null);
+      return { ok: true, data };
+    } catch (e) {
+      // Bị chặn vì 302 chuyển hướng sang accounts.google.com (do chọn quyền "Chỉ mình tôi")
+      return { 
+        ok: false, 
+        needsAnyonePermission: true,
+        message: 'URL này đang yêu cầu đăng nhập Google (quyền "Chỉ mình tôi"). Webhook không thể đẩy dữ liệu nếu chưa chuyển sang quyền "Bất kỳ ai" (Anyone).' 
+      };
+    }
+  },
+
+  /**
    * Gửi 1 đơn hàng lên Google Sheet
    * @param {Object} orderItem - Đối tượng đơn hàng
    * @returns {Promise<boolean>}
@@ -155,6 +177,86 @@ function doGet(e) {
     targetSheet: 'QuanLyGCodeIn3D',
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ========================================================
+// HÀM CHẠY TRỰC TIẾP TẠO TAB & DỮ LIỆU MẪU NGAY LẬP TỨC:
+// Trong Apps Script, chọn hàm "testTaoTabQuanLyGCode" và bấm nút "▷ Chạy" (Run)
+// để tab "QuanLyGCodeIn3D" xuất hiện ngay trong Google Sheet của bạn!
+// ========================================================
+function testTaoTabQuanLyGCode() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var targetSheetName = 'QuanLyGCodeIn3D';
+  var sheet = ss.getSheetByName(targetSheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(targetSheetName);
+    sheet.setTabColor('#0284c7');
+  }
+  
+  if (sheet.getLastRow() === 0) {
+    var headers = [
+      'Thời Gian',
+      'Tên File G-Code',
+      'Máy In',
+      'Loại Nhựa',
+      'Thời Gian In',
+      'Số Giờ (h)',
+      'Khối Lượng (g)',
+      'Số Lớp',
+      'Tiền Nhựa (đ)',
+      'Tiền Điện (đ)',
+      'Khấu Hao Máy (đ)',
+      'Tiền Công (đ)',
+      'Dự Phòng Rủi Ro (đ)',
+      'Tiền Phụ Kiện (đ)',
+      'Chi Tiết Phụ Kiện',
+      'GIÁ VỐN TOÀN DIỆN (đ)',
+      'GIÁ SỈ (đ)',
+      'GIÁ BÁN LẺ (đ)',
+      'LỢI NHUẬN RÒNG (đ)',
+      'Tỷ Suất LN',
+      'Trạng Thái',
+      'Cài Đặt In (Profile)',
+      'Ghi Chú'
+    ];
+    sheet.appendRow(headers);
+    
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground('#0f172a');
+    headerRange.setFontColor('#38bdf8');
+    headerRange.setFontWeight('bold');
+    headerRange.setHorizontalAlignment('center');
+    sheet.setFrozenRows(1);
+  }
+  
+  sheet.appendRow([
+    Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'),
+    'test_sparkx_i7_model.gcode',
+    'SparkX i7',
+    'PETG',
+    '3 giờ 15 phút',
+    3.25,
+    85,
+    320,
+    19500,
+    2000,
+    10000,
+    11000,
+    2500,
+    40000,
+    'Bộ LED USB 5V Lightbox',
+    85000,
+    115000,
+    165000,
+    80000,
+    '48.5%',
+    'Thử nghiệm thành công',
+    'SparkX i7: 210°C / 60°C • Infill 20% • 80mm/s',
+    'Kích hoạt tab thành công từ Google Apps Script!'
+  ]);
+  
+  SpreadsheetApp.getUi().alert('🎉 CHÚC MỪNG!\\nĐã tạo thành công tab "QuanLyGCodeIn3D" với dữ liệu mẫu!\\nHãy quay lại bảng tính Google Sheets của bạn để kiểm tra.');
 }
 
 function doPost(e) {

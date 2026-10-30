@@ -925,6 +925,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     GoogleSheetsSync.setWebhookUrl(url);
 
+    showToast('Đang kiểm tra kết nối với Google Sheet...', 'info');
+
+    // Kiểm tra xem URL có bị chặn quyền Anyone không
+    const check = await GoogleSheetsSync.checkWebhookStatus(url);
+    if (!check.ok && check.needsAnyonePermission) {
+      alert('⚠️ CHÚ Ý: URL Webhook này đang bị Google chặn quyền truy cập!\n\nNguyên nhân: Bản triển khai hiện tại của bạn đang chọn "Chỉ mình tôi" (Only myself), khiến Google chuyển hướng sang trang đăng nhập tài khoản.\n\n👉 Cách xử lý:\n1. Mở lại Google Sheet DGH AquaLab -> Tiện ích mở rộng -> Apps Script.\n2. Bấm "Triển khai" -> "Tùy chọn triển khai mới".\n3. Tại dòng "Ai có quyền truy cập", BẮT BUỘC chọn "Bất kỳ ai" (Anyone).\n4. Bấm Triển khai, copy URL mới và dán lại vào đây!');
+      return;
+    }
+
     const testOrder = {
       filename: 'test_sparkx_i7_model.gcode',
       status: 'Thử nghiệm',
