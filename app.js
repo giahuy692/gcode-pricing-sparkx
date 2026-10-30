@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state.currentParsedData) return;
 
     // Lấy giá trị trực tiếp từ quick tuning sliders & accessory inputs
-    const currentQuickFilament = parseInt(quickFilamentCost.value, 10);
+    const currentQuickFilament = Math.max(0, parseInt(quickFilamentCost.value, 10) || 0);
     const currentQuickMarkup = parseFloat(quickRetailMarkup.value);
     const currentAccessoryCost = Math.max(0, parseInt(inputAccessoryCost?.value || '0', 10) || 0);
     const currentAccessoryDetail = (inputAccessoryDetail?.value || '').trim();
@@ -338,10 +338,21 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file);
   });
 
-  // --- Quick Tuning Live Sliders ---
+  // --- Quick Tuning Controls (Nhập giá nhựa & Hệ số) ---
   quickFilamentCost.addEventListener('input', () => {
-    liveFilamentPrice.textContent = PricingCalculator.formatCurrency(quickFilamentCost.value);
+    const val = Math.max(0, parseInt(quickFilamentCost.value, 10) || 0);
+    liveFilamentPrice.textContent = PricingCalculator.formatCurrency(val);
     recalculateAndRender();
+  });
+
+  document.querySelectorAll('.mat-quick-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const cost = parseInt(chip.getAttribute('data-cost'), 10);
+      quickFilamentCost.value = cost;
+      liveFilamentPrice.textContent = PricingCalculator.formatCurrency(cost);
+      recalculateAndRender();
+      showToast(`Đã chọn giá nhựa: ${PricingCalculator.formatCurrency(cost)}/kg`);
+    });
   });
 
   quickRetailMarkup.addEventListener('input', () => {
