@@ -446,7 +446,7 @@
             <span class="icon">📑</span> Bảng Quản Lý Đơn Hàng & Báo Giá In 3D
           </h2>
           <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">
-            Dữ liệu tự động lưu trên trình duyệt của bạn và có thể xuất file Excel bất kỳ lúc nào.
+            Sử dụng trực tiếp file Excel (.xlsx) trên máy tính làm Cơ sở dữ liệu (Database) trung tâm.
           </p>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
@@ -456,6 +456,37 @@
           </button>
           <button id="btnClearHistory" class="btn btn-secondary btn-sm" title="Xóa toàn bộ lịch sử">
             🗑️ Xóa
+          </button>
+        </div>
+      </div>
+
+      <!-- Excel Database Control Bar -->
+      <div class="excel-db-bar" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 22px;">📊</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; display: flex; align-items: center; gap: 8px;">
+              <span>Cơ Sở Dữ Liệu Excel (Excel DB):</span>
+              <span id="excelDbStatusBadge" class="tag" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-color: rgba(148, 163, 184, 0.3); font-size: 11px;">Chưa liên kết file</span>
+            </div>
+            <div id="excelDbPathText" style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+              Chọn hoặc tạo 1 file Excel trên ổ cứng để tự động lưu mọi đơn hàng trực tiếp vào file đó.
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <button id="btnConnectExcelFile" class="btn btn-success btn-sm" type="button" title="Chọn 1 file Excel trên máy tính để đọc và ghi trực tiếp">
+            📂 Chọn File Excel Làm DB
+          </button>
+          <button id="btnCreateNewExcelDB" class="btn btn-secondary btn-sm" type="button" title="Tạo 1 file Excel Database mới tinh trên máy">
+            ➕ Tạo File Excel Mới
+          </button>
+          <label for="inputImportExcel" class="btn btn-secondary btn-sm" style="cursor: pointer; margin-bottom: 0;" title="Nhập dữ liệu từ 1 file Excel có sẵn trên máy tính">
+            📥 Nạp File Excel
+            <input type="file" id="inputImportExcel" accept=".xlsx,.xls" style="display: none;">
+          </label>
+          <button id="btnQuickSaveExcel" class="btn btn-outline-cyan btn-sm" type="button" title="Lưu ngay toàn bộ đơn hàng vào file Excel">
+            💾 Lưu File Excel
           </button>
         </div>
       </div>

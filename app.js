@@ -92,6 +92,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnExportAllExcel = document.getElementById('btnExportAllExcel');
   const btnClearHistory = document.getElementById('btnClearHistory');
 
+  // Excel Database Controls
+  const btnConnectExcelFile = document.getElementById('btnConnectExcelFile');
+  const btnCreateNewExcelDB = document.getElementById('btnCreateNewExcelDB');
+  const inputImportExcel = document.getElementById('inputImportExcel');
+  const btnQuickSaveExcel = document.getElementById('btnQuickSaveExcel');
+  const excelDbStatusBadge = document.getElementById('excelDbStatusBadge');
+  const excelDbPathText = document.getElementById('excelDbPathText');
+
   // Settings Modal Elements
   const btnOpenSettings = document.getElementById('btnOpenSettings');
   const settingsModal = document.getElementById('settingsModal');
@@ -159,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.orders = [];
     }
     renderOrdersTable();
+    updateExcelDbUI();
   }
 
   function saveOrdersToStorage() {
@@ -587,6 +596,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderOrdersTable();
     showToast(`Đã lưu đơn "${newOrder.filename}" vào bảng quản lý!`);
 
+    // Tự động ghi vào file Excel DB trên ổ cứng nếu đang kết nối
+    if (ExcelDatabase.fileHandle) {
+      ExcelDatabase.saveToConnectedFile(state.orders, state.config).then(() => {
+        showToast(`📊 Đã tự động cập nhật vào file Excel "${ExcelDatabase.fileName}" trên máy bạn!`, 'success');
+      }).catch(err => {
+        console.warn('Lỗi tự động ghi Excel DB:', err);
+      });
+    }
+
     // Tự động đẩy lên Google Sheet nếu người dùng bật tùy chọn Auto-sync
     if (GoogleSheetsSync.isAutoSyncEnabled() && GoogleSheetsSync.getWebhookUrl()) {
       GoogleSheetsSync.syncOrder(newOrder).then(() => {
@@ -643,22 +661,137 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Export to Excel (.xlsx) ---
+  // --- Export to Excel (.xlsx) & Excel Database Handlers ---
+  function updateExcelDbUI() {
+    if (!excelDbStatusBadge || !excelDbPathText) return;
+    const fileName = ExcelDatabase.getConnectedFileName();
+    if (ExcelDatabase.fileHandle && fileName) {
+      excelDbStatusBadge.textContent = `🟢 Đang liên kết: ${fileName}`;
+      excelDbStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+      excelDbStatusBadge.style.color = '#34d399';
+      excelDbStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      excelDbPathText.innerHTML = `File Excel <strong>${fileName}</strong> đang hoạt động như Database trực tiếp. Mọi đơn hàng mới hoặc chỉnh sửa sẽ tự động lưu thẳng vào file!`;
+    } else if (fileName) {
+      excelDbStatusBadge.textContent = `🟡 Cần cấp quyền lại: ${fileName}`;
+      excelDbStatusBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+      excelDbStatusBadge.style.color = '#f59e0b';
+      excelDbStatusBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+      excelDbPathText.textContent = `Bấm "Chọn File Excel Làm DB" và chọn lại file ${fileName} để kích hoạt tự động ghi.`;
+    } else {
+      excelDbStatusBadge.textContent = '⚪ Chưa liên kết file';
+      excelDbStatusBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+      excelDbStatusBadge.style.color = '#94a3b8';
+      excelDbStatusBadge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+      excelDbPathText.textContent = 'Chọn hoặc tạo 1 file Excel trên ổ cứng để biến file đó thành Database tự động lưu mọi đơn hàng!';
+    }
+  }
+
+  // 1. Chọn file Excel có sẵn trên máy làm DB
+  if (btnConnectExcelFile) {
+    btnConnectExcelFile.addEventListener('click', async () => {
+      try {
+        const res = await ExcelDatabase.connectExistingExcelFile();
+        if (res.cancelled) return;
+        updateExcelDbUI();
+
+        if (res.orders && res.orders.length > 0) {
+          const confirmLoad = confirm(`Tìm thấy ${res.orders.length} đơn hàng trong file Excel "${res.fileName}". Bạn có muốn nạp vào bảng quản lý ngay không?`);
+          if (confirmLoad) {
+            state.orders = res.orders;
+            saveOrdersToStorage();
+            renderOrdersTable();
+          }
+        } else if (state.orders.length > 0) {
+          await ExcelDatabase.saveToConnectedFile(state.orders, state.config);
+        }
+        showToast(`🟢 Đã liên kết thành công file Excel "${res.fileName}" làm Database!`);
+      } catch (err) {
+        alert('Lỗi kết nối file Excel: ' + err.message);
+      }
+    });
+  }
+
+  // 2. Tạo 1 file Excel DB mới tinh trên máy tính
+  if (btnCreateNewExcelDB) {
+    btnCreateNewExcelDB.addEventListener('click', async () => {
+      try {
+        const res = await ExcelDatabase.createNewExcelDatabase(state.orders, state.config);
+        if (res.cancelled) return;
+        updateExcelDbUI();
+        showToast(`🟢 Đã tạo và liên kết Database Excel: "${res.fileName}"!`);
+      } catch (err) {
+        alert('Lỗi tạo file Excel: ' + err.message);
+      }
+    });
+  }
+
+  // 3. Nạp (Import) dữ liệu từ file Excel bất kỳ
+  if (inputImportExcel) {
+    inputImportExcel.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      try {
+        showToast('Đang đọc dữ liệu từ file Excel...', 'info');
+        const importedOrders = await ExcelDatabase.readOrdersFromBlob(file);
+        if (!importedOrders || importedOrders.length === 0) {
+          alert('Không tìm thấy dữ liệu đơn hàng hợp lệ trong file Excel vừa nạp.');
+          return;
+        }
+
+        const mode = confirm(`Đã đọc ${importedOrders.length} đơn hàng từ "${file.name}".\n\n• Bấm OK: Nạp thay thế toàn bộ danh sách hiện tại.\n• Bấm Cancel: Hủy thao tác.`);
+        if (mode) {
+          state.orders = importedOrders;
+          saveOrdersToStorage();
+          renderOrdersTable();
+          if (ExcelDatabase.fileHandle) {
+            await ExcelDatabase.saveToConnectedFile(state.orders, state.config);
+          }
+          showToast(`📥 Đã nạp thành công ${importedOrders.length} đơn hàng từ Excel!`);
+        }
+      } catch (err) {
+        alert('Lỗi khi nạp file Excel: ' + err.message);
+      } finally {
+        inputImportExcel.value = '';
+      }
+    });
+  }
+
+  // 4. Lưu nhanh vào file Excel (Ghi đè file nếu đã liên kết hoặc tải file về)
+  if (btnQuickSaveExcel) {
+    btnQuickSaveExcel.addEventListener('click', async () => {
+      if (state.orders.length === 0 && !state.currentCalculation) {
+        alert('Chưa có dữ liệu đơn hàng nào để lưu!');
+        return;
+      }
+
+      if (ExcelDatabase.fileHandle) {
+        try {
+          await ExcelDatabase.saveToConnectedFile(state.orders, state.config);
+          showToast(`💾 Đã lưu cập nhật vào file Excel "${ExcelDatabase.fileName}" trên máy bạn!`);
+        } catch (err) {
+          alert('Lỗi ghi file Excel: ' + err.message);
+        }
+      } else {
+        ExcelDatabase.exportAndDownload(state.orders, state.config);
+        showToast('📊 Đã xuất file Excel (.xlsx) tải về máy tính!');
+      }
+    });
+  }
+
+  // 5. Nút xuất file Excel trên Header
   btnExportAllExcel.addEventListener('click', () => {
     if (state.orders.length === 0) {
       if (state.currentCalculation) {
-        // Nếu chưa lưu vào history nhưng có đơn hiện tại, tự động tạo tạm 1 đơn để xuất
         const tempOrder = {
           id: 'ORD-TEMP',
           createdAt: new Date().toISOString(),
-          filename: state.currentParsedData.filename,
-          customerName: inputCustomerName.value.trim() || 'Khách vãng lai',
-          customerPhone: inputCustomerPhone.value.trim() || '',
+          filename: state.currentParsedData ? state.currentParsedData.filename : 'Chưa đặt tên',
           status: selectOrderStatus.value,
           notes: inputOrderNotes.value.trim(),
           calculation: state.currentCalculation
         };
-        ExcelExporter.exportHistory([tempOrder], state.config);
+        ExcelDatabase.exportAndDownload([tempOrder], state.config);
         showToast('Đã xuất báo giá file G-code hiện tại ra Excel!');
       } else {
         alert('Chưa có dữ liệu báo giá nào để xuất file Excel. Vui lòng nạp file G-code trước!');
@@ -666,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    ExcelExporter.exportHistory(state.orders, state.config);
+    ExcelDatabase.exportAndDownload(state.orders, state.config);
     showToast(`Đã xuất ${state.orders.length} đơn hàng ra file Excel (.xlsx)!`);
   });
 
@@ -740,6 +873,9 @@ document.addEventListener('DOMContentLoaded', () => {
           state.orders = state.orders.filter(o => o.id !== id);
           saveOrdersToStorage();
           renderOrdersTable();
+          if (ExcelDatabase.fileHandle) {
+            ExcelDatabase.saveToConnectedFile(state.orders, state.config).catch(console.warn);
+          }
           showToast('Đã xóa đơn hàng.');
         }
       });
@@ -794,6 +930,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.orders = [];
       saveOrdersToStorage();
       renderOrdersTable();
+      if (ExcelDatabase.fileHandle) {
+        ExcelDatabase.saveToConnectedFile(state.orders, state.config).catch(console.warn);
+      }
       showToast('Đã dọn sạch lịch sử đơn hàng.');
     }
   });
