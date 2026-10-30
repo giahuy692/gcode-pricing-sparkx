@@ -11,8 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <!-- Local SheetJS (XLSX) Library -->
-  <script src="xlsx.full.min.js"></script>
+  <!-- SheetJS (XLSX) Library (CDN + Local Fallback) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script>if (typeof XLSX === 'undefined') { document.write('<script src="xlsx.full.min.js"><\/script>'); }</script>
   
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css">
