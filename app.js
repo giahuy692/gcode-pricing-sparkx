@@ -593,6 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('☁️ Đã đồng bộ lên Google Sheet!', 'info');
       }).catch(err => {
         console.warn('Lỗi auto-sync Google Sheet:', err);
+        showToast('Đơn đã lưu trên máy; đồng bộ Google Sheets chưa thành công: ' + err.message, 'error');
       });
     }
   });
@@ -871,9 +872,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateGSheetStatusUI() {
     const url = GoogleSheetsSync.getWebhookUrl();
     if (url) {
-      gsheetStatusDot.style.background = '#10b981';
-      gsheetConnectionLabel.textContent = '🟢 Đã kết nối';
-      gsheetConnectionLabel.style.color = '#10b981';
+      gsheetStatusDot.style.background = '#f59e0b';
+      gsheetConnectionLabel.textContent = '🟡 Đã cấu hình — cần gửi thử';
+      gsheetConnectionLabel.style.color = '#f59e0b';
       inputGSheetWebhook.value = url;
     } else {
       gsheetStatusDot.style.background = '#94a3b8';
@@ -901,6 +902,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnSaveGSheetConfig.addEventListener('click', () => {
     const url = inputGSheetWebhook.value.trim();
+    try { if (url) GoogleSheetsSync.validateWebhookUrl(url); }
+    catch (error) { alert(error.message); return; }
     GoogleSheetsSync.setWebhookUrl(url);
     GoogleSheetsSync.setAutoSync(chkAutoSyncGSheet.checked);
     updateGSheetStatusUI();
@@ -927,10 +930,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showToast('Đang kiểm tra kết nối với Google Sheet...', 'info');
 
-    // Kiểm tra xem URL có bị chặn quyền Anyone không
     const check = await GoogleSheetsSync.checkWebhookStatus(url);
-    if (!check.ok && check.needsAnyonePermission) {
-      alert('⚠️ CHÚ Ý: URL Webhook này đang bị Google chặn quyền truy cập!\n\nNguyên nhân: Bản triển khai hiện tại của bạn đang chọn "Chỉ mình tôi" (Only myself), khiến Google chuyển hướng sang trang đăng nhập tài khoản.\n\n👉 Cách xử lý:\n1. Mở lại Google Sheet DGH AquaLab -> Tiện ích mở rộng -> Apps Script.\n2. Bấm "Triển khai" -> "Tùy chọn triển khai mới".\n3. Tại dòng "Ai có quyền truy cập", BẮT BUỘC chọn "Bất kỳ ai" (Anyone).\n4. Bấm Triển khai, copy URL mới và dán lại vào đây!');
+    if (!check.ok) {
+      alert(check.message);
       return;
     }
 
@@ -1023,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         showToast(`Đang đồng bộ ${state.orders.length} đơn hàng...`, 'info');
         const count = await GoogleSheetsSync.syncBatch(state.orders);
-        showToast(`☁️ Đã đồng bộ thành công ${count} đơn hàng lên Google Sheet!`);
+        showToast(`☁️ Google Sheets xác nhận ${count}/${state.orders.length} đơn. ${state.orders.length - count} đơn chưa được xác nhận.`);
       } catch (e) {
         alert('Lỗi đồng bộ: ' + e.message);
       }

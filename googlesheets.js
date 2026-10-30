@@ -51,26 +51,42 @@ const GoogleSheetsSync = {
     } catch (e) {}
   },
 
-  /**
-   * Kiểm tra xem Webhook URL có mở quyền "Bất kỳ ai (Anyone)" hay không
-   */
-  async checkWebhookStatus(url) {
-    const targetUrl = (url || this.getWebhookUrl() || '').trim();
-    if (!targetUrl) return { ok: false, message: 'Chưa có URL Webhook!' };
-    
+  validateWebhookUrl(url) {
     try {
-      // Thử gọi GET với mode cors. Nếu Webhook mở "Anyone", CORS sẽ cho phép nhận phản hồi từ script.googleusercontent.com
-      const res = await fetch(targetUrl, { method: 'GET', mode: 'cors' });
-      const data = await res.json().catch(() => null);
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'script.google.com' &&
+          /^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(parsed.pathname) && !parsed.search && !parsed.hash) return url;
+    } catch (e) {}
+    throw new Error('Hãy nhập URL triển khai Google Apps Script dạng https://script.google.com/macros/s/.../exec.');
+  },
+
+  async request(url, options = {}) {
+    this.validateWebhookUrl(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(url, { ...options, mode: 'cors', credentials: 'omit', signal: controller.signal });
+      if (!response.ok) throw new Error('Google trả về HTTP ' + response.status);
+      let data;
+      try { data = await response.json(); }
+      catch (e) { throw new Error('Webhook không trả về JSON hợp lệ. Kiểm tra URL /exec, quyền truy cập và phiên bản triển khai Apps Script.'); }
+      if (!data || !['online', 'success'].includes(data.status)) {
+        throw new Error((data && data.message) || 'Google Sheets chưa xác nhận thao tác thành công.');
+      }
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('Google Sheets phản hồi quá 30 giây. Chưa xác nhận đã lưu; kiểm tra bảng tính trước khi gửi lại.');
+      if (error instanceof TypeError) throw new Error('Không truy cập được webhook. Kiểm tra mạng, URL /exec và quyền Bất kỳ ai (Anyone); lỗi mạng/CORS không xác định được chính xác quyền triển khai.');
+      throw error;
+    } finally { clearTimeout(timeout); }
+  },
+
+  async checkWebhookStatus(url) {
+    try {
+      const data = await this.request((url || this.getWebhookUrl() || '').trim());
+      if (data.status !== 'online' || data.targetSheet !== 'QuanLyGCodeIn3D') throw new Error('Webhook chưa dùng đúng mã CostMaster. Hãy cập nhật Apps Script và triển khai phiên bản mới.');
       return { ok: true, data };
-    } catch (e) {
-      // Bị chặn vì 302 chuyển hướng sang accounts.google.com (do chọn quyền "Chỉ mình tôi")
-      return { 
-        ok: false, 
-        needsAnyonePermission: true,
-        message: 'URL này đang yêu cầu đăng nhập Google (quyền "Chỉ mình tôi"). Webhook không thể đẩy dữ liệu nếu chưa chuyển sang quyền "Bất kỳ ai" (Anyone).' 
-      };
-    }
+    } catch (error) { return { ok: false, message: error.message }; }
   },
 
   /**
@@ -115,15 +131,12 @@ const GoogleSheetsSync = {
     };
 
     try {
-      // Gửi bằng mode no-cors để vượt qua chính sách CORS của Google Apps Script Redirect
-      await fetch(webhookUrl, {
+      const result = await this.request(webhookUrl, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
+      if (result.status !== 'success') throw new Error('Webhook chưa xác nhận ghi dòng dữ liệu.');
       return true;
     } catch (error) {
       console.error('Lỗi khi gửi lên Google Sheet:', error);
@@ -171,6 +184,9 @@ const GoogleSheetsSync = {
 // ========================================================
 
 function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Không tìm thấy bảng tính. Tạo Apps Script từ Tiện ích mở rộng của Google Sheet đích.'})).setMimeType(ContentService.MimeType.JSON);
+  ss.getName();
   return ContentService.createTextOutput(JSON.stringify({
     status: 'online',
     message: 'G-Code CostMaster Webhook is LIVE! (Sẵn sàng nhận dữ liệu)',
@@ -260,7 +276,12 @@ function testTaoTabQuanLyGCode() {
 }
 
 function doPost(e) {
+  var lock = LockService.getScriptLock();
   try {
+    lock.waitLock(30000);
+    if (!e || !e.postData || !e.postData.contents) throw new Error('Thiếu dữ liệu POST');
+    var data = JSON.parse(e.postData.contents);
+    if (data.action !== 'add_row' || !data.filename) throw new Error('Dữ liệu đơn hàng không hợp lệ');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // Luôn ghi dữ liệu vào tab chuyên biệt riêng 'QuanLyGCodeIn3D'
@@ -272,8 +293,6 @@ function doPost(e) {
     if (!sheet) {
       sheet = ss.insertSheet(targetSheetName);
     }
-    
-    var data = JSON.parse(e.postData.contents);
     
     // Nếu bảng tính mới hoàn toàn, tự động tạo Tiêu đề cột đẹp mắt
     if (sheet.getLastRow() === 0) {
@@ -340,11 +359,14 @@ function doPost(e) {
       data.notes || ''
     ]);
     
+    SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Row added' }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
 }`;
   }
