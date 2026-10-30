@@ -138,26 +138,35 @@ const GoogleSheetsSync = {
     return `// ========================================================
 // MÃ GOOGLE APPS SCRIPT CHO G-CODE COSTMASTER 3D (SPARKX i7)
 // Hướng dẫn:
-// 1. Mở file Google Sheet của bạn trên trình duyệt
+// 1. Mở file Google Sheet "DGH AquaLab" của bạn trên trình duyệt
 // 2. Vào menu: Tiện ích mở rộng (Extensions) -> Apps Script
-// 3. Xóa hết mã cũ, dán toàn bộ đoạn mã này vào rồi bấm Lưu (Ctrl+S)
+// 3. Xóa hết mã cũ trong đó, dán toàn bộ đoạn mã này vào rồi bấm Lưu (Ctrl+S)
 // 4. Bấm "Triển khai" (Deploy) -> "Tùy chọn triển khai mới" (New deployment)
 // 5. Chọn loại: "Ứng dụng web" (Web app)
 //    - Người thực thi: "Tôi" (Me)
-//    - Ai có quyền truy cập: "Bất kỳ ai" (Anyone)
+//    - Ai có quyền truy cập: "Bất kỳ ai" (Anyone)  <--- BẮT BUỘC CHỌN "BẤT KỲ AI"
 // 6. Bấm "Triển khai" và sao chép URL Ứng dụng web dán vào G-Code CostMaster!
 // ========================================================
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'online',
+    message: 'G-Code CostMaster Webhook is LIVE! (Sẵn sàng nhận dữ liệu)',
+    targetSheet: 'QuanLyGCodeIn3D',
+    timestamp: new Date().toISOString()
+  })).setMimeType(ContentService.MimeType.JSON);
+}
 
 function doPost(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // Luôn ghi dữ liệu vào tab chuyên biệt riêng 'QuanLyGCodeIn3D'
-    // Đảm bảo không làm ảnh hưởng hay xáo trộn các tab khác (1_CONG_CU_CHINH, Kho, v.v.)
+    // Giữ nguyên vẹn 100% các tab hiện có (1_CONG_CU_CHINH, 2_KHO,...)
     var targetSheetName = 'QuanLyGCodeIn3D';
     var sheet = ss.getSheetByName(targetSheetName);
     
-    // Nếu chưa có tab 'QuanLyGCodeIn3D', tự động tạo mới!
+    // Nếu chưa có tab 'QuanLyGCodeIn3D', tự động tạo tab mới!
     if (!sheet) {
       sheet = ss.insertSheet(targetSheetName);
     }

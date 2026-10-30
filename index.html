@@ -636,22 +636,28 @@
 
           <div class="instruction-step">
             <span class="step-num">1</span>
-            <div>Tạo 1 file Google Sheet mới trên <a href="https://sheets.new" target="_blank" style="color: var(--accent-cyan); text-decoration: underline;">sheets.new</a> (ví dụ đặt tên: <em>"Quản Lý Đơn Hàng In 3D"</em>).</div>
+            <div>Mở file Google Sheet của bạn (ví dụ file <strong>DGH AquaLab</strong>) &rarr; Bấm nút <strong>📋 Copy Mã Apps Script</strong> ở góc trên.</div>
           </div>
 
           <div class="instruction-step">
             <span class="step-num">2</span>
-            <div>Vào menu: <strong>Tiện ích mở rộng (Extensions)</strong> &rarr; <strong>Apps Script</strong>. Xóa hết mã cũ trong đó và dán mã đã copy vào &rarr; Nhấn <strong>Lưu</strong> (Ctrl+S).</div>
+            <div>Trên Google Sheet, vào menu: <strong>Tiện ích mở rộng (Extensions)</strong> &rarr; <strong>Apps Script</strong>. Xóa hết mã cũ trong file <code>Code.gs</code>, dán toàn bộ mã vừa copy vào &rarr; Nhấn <strong>Lưu</strong> (Ctrl+S).</div>
           </div>
 
           <div class="instruction-step">
             <span class="step-num">3</span>
-            <div>Bấm <strong>Triển khai (Deploy)</strong> &rarr; <strong>Tùy chọn triển khai mới (New deployment)</strong> &rarr; Chọn <strong>Ứng dụng web (Web app)</strong>:
-              <ul style="margin-left: 18px; margin-top: 4px; color: var(--text-dim);">
-                <li>Ai có quyền truy cập (Who has access): Chọn <strong>Bất kỳ ai (Anyone)</strong>.</li>
-                <li>Bấm <strong>Triển khai</strong> &rarr; Sao chép <strong>URL ứng dụng web</strong> và dán vào ô bên trên!</li>
+            <div>Bấm <strong>Triển khai (Deploy)</strong> &rarr; <strong>Tùy chọn triển khai mới (New deployment)</strong> &rarr; Nhấn vào biểu tượng bánh răng ⚙️ chọn <strong>Ứng dụng web (Web app)</strong>:
+              <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-dim); line-height: 1.6;">
+                <li>Người thực thi (Execute as): <strong>Tôi (Me)</strong></li>
+                <li><strong style="color: #facc15;">⚠️ Ai có quyền truy cập (Who has access):</strong> Chọn <strong style="color: #10b981; font-size: 14px;">Bất kỳ ai (Anyone)</strong> <em>(Bắt buộc! Nếu chọn "Chỉ mình tôi", Google sẽ chặn bảo mật đòi đăng nhập và không ghi được dữ liệu).</em></li>
+                <li>Bấm <strong>Triển khai</strong> &rarr; Chọn <em>Cấp quyền truy cập</em> &rarr; <em>Nâng cao</em> &rarr; <em>Đi tới... (không an toàn)</em> &rarr; <em>Cho phép</em>.</li>
+                <li>Sao chép <strong>URL ứng dụng web</strong> và dán vào ô bên trên &rarr; Bấm <strong>Lưu Cấu Hình</strong>!</li>
               </ul>
             </div>
+          </div>
+          
+          <div style="margin-top: 10px; padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 12px; color: #bae6fd;">
+            💡 <strong>Dữ liệu lưu ở đâu?</strong> Hệ thống sẽ tự động tạo một tab mới toanh tên <strong>QuanLyGCodeIn3D</strong> ở thanh tab dưới cùng. Các tab làm việc hiện tại của bạn (<em>1_CONG_CU_CHINH, 2_KHO,...</em>) được bảo vệ an toàn 100%, không bị chèn đè hay xáo trộn!
           </div>
         </div>
       </div>
