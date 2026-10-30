@@ -4,9 +4,107 @@
  */
 
 const PricingCalculator = {
+  // Thư viện thông số chuẩn các dòng máy in FDM phổ biến
+  PRINTER_DATABASE: {
+    'sparkx-i7': {
+      id: 'sparkx-i7',
+      name: 'SparkX i7 (Máy in chính)',
+      badge: 'Công Nghiệp 300x300',
+      powerWatt: 380,
+      machinePrice: 28000000,
+      lifespanHours: 8000,
+      maintenancePerHour: 1500,
+      bedSize: '300x300x400 mm',
+      note: 'Bàn nhiệt lớn 300x300, ray trượt tuyến tính'
+    },
+    'bambu-x1c-p1s': {
+      id: 'bambu-x1c-p1s',
+      name: 'Bambu Lab X1-Carbon / P1S',
+      badge: 'CoreXY Kín 256x256',
+      powerWatt: 350,
+      machinePrice: 24000000,
+      lifespanHours: 6000,
+      maintenancePerHour: 1500,
+      bedSize: '256x256x256 mm',
+      note: 'Lồng kín gia nhiệt, CoreXY tốc độ cao'
+    },
+    'bambu-a1': {
+      id: 'bambu-a1',
+      name: 'Bambu Lab A1 / A1 Mini',
+      badge: 'Bed Slinger 256x256',
+      powerWatt: 280,
+      machinePrice: 12000000,
+      lifespanHours: 5000,
+      maintenancePerHour: 1000,
+      bedSize: '256x256x256 mm',
+      note: 'Dòng mở gia đình, bàn nhiệt nhỏ'
+    },
+    'creality-k1-max': {
+      id: 'creality-k1-max',
+      name: 'Creality K1 / K1 Max',
+      badge: 'CoreXY Tốc Độ Cao',
+      powerWatt: 420,
+      machinePrice: 18000000,
+      lifespanHours: 6000,
+      maintenancePerHour: 1500,
+      bedSize: '300x300x300 mm',
+      note: 'Bàn nhiệt lớn 300x300 tốc độ cao'
+    },
+    'creality-ender3-v3': {
+      id: 'creality-ender3-v3',
+      name: 'Creality Ender-3 V3 / SE / KE',
+      badge: 'Phổ Thông 220x220',
+      powerWatt: 240,
+      machinePrice: 6500000,
+      lifespanHours: 4000,
+      maintenancePerHour: 800,
+      bedSize: '220x220x250 mm',
+      note: 'Bàn nhiệt nhỏ 220x220, tiết kiệm điện'
+    },
+    'voron-24': {
+      id: 'voron-24',
+      name: 'Voron 2.4 / Trident (350mm)',
+      badge: 'Khổ Siêu Lớn 350x350',
+      powerWatt: 520,
+      machinePrice: 32000000,
+      lifespanHours: 10000,
+      maintenancePerHour: 2000,
+      bedSize: '350x350x350 mm',
+      note: 'Bàn nhiệt AC công suất cao 350x350'
+    },
+    'custom': {
+      id: 'custom',
+      name: 'Tùy Chỉnh Máy Khác...',
+      badge: 'Tự Cấu Hình',
+      powerWatt: 350,
+      machinePrice: 15000000,
+      lifespanHours: 5000,
+      maintenancePerHour: 1000,
+      bedSize: 'Tùy chỉnh',
+      note: 'Theo thông số bạn tự đặt trong Cài Đặt'
+    }
+  },
+
+  getPrinterProfile(id) {
+    return this.PRINTER_DATABASE[id] || this.PRINTER_DATABASE['sparkx-i7'];
+  },
+
+  detectPrinterProfileFromText(text) {
+    if (!text) return 'sparkx-i7';
+    const lower = text.toLowerCase();
+    if (lower.includes('sparkx') || lower.includes('spark') || lower.includes('i7')) return 'sparkx-i7';
+    if (lower.includes('x1') || lower.includes('p1s') || lower.includes('p1p') || lower.includes('bambu x1') || lower.includes('bambu p1')) return 'bambu-x1c-p1s';
+    if (lower.includes('a1 mini') || lower.includes('bambu a1') || lower.includes('a1')) return 'bambu-a1';
+    if (lower.includes('k1 max') || lower.includes('k1') || lower.includes('creality k1')) return 'creality-k1-max';
+    if (lower.includes('ender') || lower.includes('cr-')) return 'creality-ender3-v3';
+    if (lower.includes('voron') || lower.includes('trident')) return 'voron-24';
+    return 'sparkx-i7';
+  },
+
   // Cấu hình chuẩn mặc định cho dòng máy in SparkX i7 (Dòng FDM khổ lớn công nghiệp)
   DEFAULT_CONFIG: {
     printerName: 'SparkX i7',       // Tên dòng máy in đang sử dụng
+    selectedPrinterId: 'sparkx-i7', // Mã định danh profile máy in đang chọn
     // Giá vật liệu
     filamentCostPerKg: 220000,      // Giá 1 cuộn nhựa 1kg (220.000đ cho PLA/PETG)
     wastagePercent: 5,              // Hao hụt / hỗ trợ in / purge line (5%)
@@ -93,6 +191,13 @@ const PricingCalculator = {
     const weightGrams = Math.max(0, parseFloat(gcodeData.filamentWeightGrams) || 0);
     const timeHours = Math.max(0, parseFloat(gcodeData.timeHours) || 0);
 
+    // Áp dụng thông số theo profile máy in đang chọn
+    const printerProfile = this.getPrinterProfile(cfg.selectedPrinterId || 'sparkx-i7');
+    const machinePowerWatt = parseFloat(customConfig?.machinePowerWatt ?? cfg.machinePowerWatt ?? printerProfile.powerWatt);
+    const machinePrice = parseFloat(customConfig?.machinePrice ?? cfg.machinePrice ?? printerProfile.machinePrice);
+    const machineLifespanHours = parseFloat(customConfig?.machineLifespanHours ?? cfg.machineLifespanHours ?? printerProfile.lifespanHours);
+    const maintenancePerHour = parseFloat(customConfig?.maintenancePerHour ?? cfg.maintenancePerHour ?? printerProfile.maintenancePerHour);
+
     // 1. Chi phí nhựa (Filament Cost)
     const costFilamentBase = (weightGrams / 1000) * cfg.filamentCostPerKg;
     const costFilamentWastage = costFilamentBase * (cfg.wastagePercent / 100);
@@ -100,11 +205,11 @@ const PricingCalculator = {
 
     // 2. Chi phí điện năng (Power Cost)
     // kWh = (Watt / 1000) * giờ in
-    const kwhUsed = (cfg.machinePowerWatt / 1000) * timeHours;
+    const kwhUsed = (machinePowerWatt / 1000) * timeHours;
     const costElectricity = Math.round(kwhUsed * cfg.electricityPricePerKwh);
 
     // 3. Khấu hao máy & Bảo trì (Depreciation & Maintenance)
-    const depPerHour = (cfg.machinePrice / cfg.machineLifespanHours) + cfg.maintenancePerHour;
+    const depPerHour = (machinePrice / machineLifespanHours) + maintenancePerHour;
     const costDepreciation = Math.round(timeHours * depPerHour);
 
     // 4. Chi phí nhân công & Xử lý (Labor & Post-processing)
@@ -192,6 +297,9 @@ const PricingCalculator = {
       pricePerGram,
       pricePerHour,
       kwhUsed: Number(kwhUsed.toFixed(2)),
+      printerProfile,
+      machinePowerWatt,
+      depPerHour: Math.round(depPerHour),
 
       // Tỷ trọng
       breakdownPercentages,

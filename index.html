@@ -46,6 +46,38 @@
       </div>
     </header>
 
+    <!-- Printer Profile Selector & Live Energy Bar -->
+    <div class="printer-profile-bar" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: 12px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+          <span>🖨️ Dòng Máy In Đang Dùng:</span>
+        </span>
+        <select id="selectPrinterProfile" class="form-control" style="width: auto; min-width: 280px; font-weight: 700; padding: 7px 14px; font-size: 13px; background: rgba(11, 15, 25, 0.85); border: 1px solid rgba(56, 189, 248, 0.4); color: #f8fafc; border-radius: var(--radius-sm); cursor: pointer;">
+          <option value="sparkx-i7" selected>✨ SparkX i7 (380W • Khổ lớn 300x300 • Ray trượt)</option>
+          <option value="bambu-x1c-p1s">Bambu Lab X1-Carbon / P1S (350W • CoreXY kín)</option>
+          <option value="bambu-a1">Bambu Lab A1 / A1 Mini (280W • Khổ 256)</option>
+          <option value="creality-k1-max">Creality K1 / K1 Max (420W • 300x300)</option>
+          <option value="creality-ender3-v3">Creality Ender-3 V3 (240W • Khổ 220)</option>
+          <option value="voron-24">Voron 2.4 / Trident (520W • Khổ 350 AC)</option>
+          <option value="custom">⚙️ Tùy Chỉnh Máy Khác...</option>
+        </select>
+        <span id="badgePrinterAutoDetected" class="tag" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3); font-size: 11px;">
+          TỐI ƯU CHO SPARKX i7
+        </span>
+      </div>
+
+      <!-- Live Machine Energy & Depreciation Metrics Specs -->
+      <div style="display: flex; gap: 16px; align-items: center; font-size: 12px; font-family: var(--font-mono); color: var(--text-dim); flex-wrap: wrap;">
+        <div>⚡ Công suất điện: <strong id="dispMachineWatt" style="color: #facc15; font-size: 13px;">380W</strong></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.12);"></div>
+        <div>💡 Giá điện: <strong style="color: #f8fafc;">2.600 đ/kWh</strong></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.12);"></div>
+        <div>🛡️ Khấu hao máy: <strong id="dispMachineDep" style="color: #c084fc;">3.500 đ/h</strong></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.12);"></div>
+        <div>🔧 Phí bảo dưỡng: <strong id="dispMachineMaint" style="color: #38bdf8;">1.500 đ/h</strong></div>
+      </div>
+    </div>
+
     <!-- Main Workspace Grid -->
     <main class="main-grid">
       <!-- Left Column: G-code Upload & Parsed Specs -->

@@ -909,3 +909,27 @@ select.form-control {
   font-size: 12px;
 }
 
+/* Printer Profile & Energy Bar */
+.printer-profile-bar {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.printer-profile-bar select:hover,
+.printer-profile-bar select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+  outline: none;
+}
+
+

@@ -65,6 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const quickRetailMarkup = document.getElementById('quickRetailMarkup');
   const liveMarkup = document.getElementById('liveMarkup');
 
+  // Printer Profile Elements (Hồ sơ dòng máy in & Công suất)
+  const selectPrinterProfile = document.getElementById('selectPrinterProfile');
+  const badgePrinterAutoDetected = document.getElementById('badgePrinterAutoDetected');
+  const dispMachineWatt = document.getElementById('dispMachineWatt');
+  const dispMachineDep = document.getElementById('dispMachineDep');
+  const dispMachineMaint = document.getElementById('dispMachineMaint');
+
   // Accessories Elements (Hỗ trợ nhiều phụ kiện cho 1 sản phẩm)
   const accessoriesListContainer = document.getElementById('accessoriesListContainer');
   const btnAddAccessoryRow = document.getElementById('btnAddAccessoryRow');
@@ -236,6 +243,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentQuickFilament = Math.max(0, parseInt(quickFilamentCost.value, 10) || 0);
     const currentQuickMarkup = parseFloat(quickRetailMarkup.value);
 
+    // Lấy profile máy in đang chọn
+    const selectedPrinterId = selectPrinterProfile ? selectPrinterProfile.value : (state.config.selectedPrinterId || 'sparkx-i7');
+    const profile = PricingCalculator.getPrinterProfile(selectedPrinterId);
+
+    // Cập nhật thanh hiển thị thông số điện & khấu hao của máy
+    if (dispMachineWatt) dispMachineWatt.textContent = `${profile.powerWatt}W`;
+    if (dispMachineDep) {
+      const depHour = Math.round(profile.machinePrice / profile.lifespanHours);
+      dispMachineDep.textContent = PricingCalculator.formatCurrency(depHour) + '/h';
+    }
+    if (dispMachineMaint) dispMachineMaint.textContent = PricingCalculator.formatCurrency(profile.maintenancePerHour) + '/h';
+
     // Tính tổng chi phí phụ kiện từ danh sách nhiều món
     const totalAccessoryCost = state.accessories.reduce((sum, item) => {
       const c = Math.max(0, parseInt(item.unitCost, 10) || 0);
@@ -249,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .join(' + ');
 
     const overrides = {
+      selectedPrinterId: selectedPrinterId,
       filamentCostPerKg: currentQuickFilament,
       markupRetail: currentQuickMarkup,
       costAccessories: totalAccessoryCost,
@@ -286,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pctFilamentText.textContent = `${calc.breakdownPercentages.filament}%`;
 
     costElectricityText.textContent = PricingCalculator.formatCurrency(calc.costElectricity);
-    pctElectricityText.textContent = `${calc.breakdownPercentages.electricity}%`;
+    pctElectricityText.textContent = `${calc.kwhUsed} kWh (${calc.breakdownPercentages.electricity}%)`;
 
     costDepreciationText.textContent = PricingCalculator.formatCurrency(calc.costDepreciation);
     pctDepreciationText.textContent = `${calc.breakdownPercentages.depreciation}%`;
@@ -364,6 +384,20 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const parsed = GCodeParser.parse(content, filename);
       state.currentParsedData = parsed;
+
+      // Tự động nhận diện profile máy in nếu tìm thấy trong G-code
+      const detectedId = PricingCalculator.detectPrinterProfileFromText(
+        (parsed.printerModel || '') + ' ' + (parsed.filename || '')
+      );
+      if (selectPrinterProfile && detectedId) {
+        selectPrinterProfile.value = detectedId;
+        state.config.selectedPrinterId = detectedId;
+        if (badgePrinterAutoDetected) {
+          const p = PricingCalculator.getPrinterProfile(detectedId);
+          badgePrinterAutoDetected.textContent = `TỰ ĐỘNG: ${p.badge}`;
+        }
+      }
+
       recalculateAndRender();
       showToast(`Đã phân tích thành công: ${filename}`);
     } catch (err) {
@@ -436,6 +470,25 @@ document.addEventListener('DOMContentLoaded', () => {
     liveMarkup.textContent = `x${parseFloat(quickRetailMarkup.value).toFixed(1)}`;
     recalculateAndRender();
   });
+
+  // --- Printer Profile Selector Listener ---
+  if (selectPrinterProfile) {
+    selectPrinterProfile.addEventListener('change', () => {
+      const selectedId = selectPrinterProfile.value;
+      if (selectedId === 'custom') {
+        btnOpenSettings.click();
+        return;
+      }
+      state.config.selectedPrinterId = selectedId;
+      PricingCalculator.saveConfig({ selectedPrinterId: selectedId });
+      if (badgePrinterAutoDetected) {
+        const p = PricingCalculator.getPrinterProfile(selectedId);
+        badgePrinterAutoDetected.textContent = p.badge;
+      }
+      recalculateAndRender();
+      showToast(`Đã chuyển sang: ${PricingCalculator.getPrinterProfile(selectedId).name}`);
+    });
+  }
 
   // --- Multi-Accessories Event Listeners ---
   if (btnAddAccessoryRow) {
